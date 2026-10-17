@@ -66,10 +66,10 @@ function M.home(task)
   end
   vim.list_extend(lines, {
     "",
-    "Press Enter to open the Weft command centre.",
+    "Press Enter to open the full workspace.",
     "",
-    "<leader>ww  Weft command centre",
-    "<leader>wW  Open full workspace",
+    "<leader>ww  Open full workspace",
+    "<leader>wW  Weft command centre",
     "<leader>wc  Chat",
     "<leader>wl  Changes",
     "<leader>wb  Task buffers",
@@ -80,8 +80,8 @@ function M.home(task)
   vim.api.nvim_win_set_buf(0, buffer)
   views(task).home = { buffer = buffer, window = vim.api.nvim_get_current_win() }
   vim.keymap.set("n", "<CR>", util.guard(function()
-    require("weft").menu()
-  end), { buffer = buffer, desc = "Open Weft command centre" })
+    require("weft").open(task)
+  end), { buffer = buffer, desc = "Open Weft workspace" })
 end
 
 function M.source(task, buffer)

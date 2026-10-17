@@ -13,6 +13,7 @@ local defaults = {
   command_timeout = 120000,
   model = "gpt-5.3-codex",
   mappings = true,
+  open_changed_files = false,
 }
 
 local function current()
@@ -42,6 +43,42 @@ function M.new(name)
   end)
 end
 
+function M.select(items, options, callback)
+  if M.config.picker then
+    return M.config.picker(items, options, callback)
+  end
+  local ok = pcall(require, "telescope")
+  if not ok then
+    return vim.ui.select(items, options, callback)
+  end
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
+  local config = require("telescope.config").values
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+  return pickers
+    .new({}, {
+      prompt_title = options.prompt or "Weft",
+      finder = finders.new_table({
+        results = items,
+        entry_maker = function(item)
+          local display = options.format_item and options.format_item(item) or tostring(item)
+          return { value = item, display = display, ordinal = display }
+        end,
+      }),
+      sorter = config.generic_sorter({}),
+      attach_mappings = function(prompt_buffer)
+        actions.select_default:replace(function()
+          local selection = action_state.get_selected_entry()
+          actions.close(prompt_buffer)
+          callback(selection and selection.value)
+        end)
+        return true
+      end,
+    })
+    :find()
+end
+
 function M.tasks(on_selected)
   local tasks = vim.tbl_values(store.tasks)
   table.sort(tasks, function(a, b)
@@ -50,7 +87,7 @@ function M.tasks(on_selected)
   if #tasks == 0 then
     return util.notify("No tasks yet. Add repos with :Weft repo add <path>, then :Weft new <name>")
   end
-  vim.ui.select(
+  M.select(
     tasks,
     {
       prompt = "Weft tasks",
@@ -63,6 +100,8 @@ function M.tasks(on_selected)
         workspace.switch(task)
         if on_selected then
           on_selected(task)
+        else
+          M.open(task)
         end
       end
     end)
@@ -124,44 +163,12 @@ function M.menu()
       action.callback()
     end
   end
-  local ok, telescope = pcall(require, "telescope")
-  if ok then
-    local pickers = require("telescope.pickers")
-    local finders = require("telescope.finders")
-    local config = require("telescope.config").values
-    local actions_module = require("telescope.actions")
-    local action_state = require("telescope.actions.state")
-    return pickers
-      .new({}, {
-        prompt_title = task and "Weft · " .. task.name or "Weft",
-        finder = finders.new_table({
-          results = actions,
-          entry_maker = function(action)
-            return {
-              value = action,
-              display = action.label .. "  " .. action.description,
-              ordinal = action.label .. " " .. action.description,
-            }
-          end,
-        }),
-        sorter = config.generic_sorter({}),
-        attach_mappings = function(prompt_buffer)
-          actions_module.select_default:replace(function()
-            local selection = action_state.get_selected_entry()
-            actions_module.close(prompt_buffer)
-            select(selection and selection.value)
-          end)
-          return true
-        end,
-      })
-      :find()
-  end
-  vim.ui.select(actions, {
+  return M.select(actions, {
     prompt = task and "Weft · " .. task.name or "Weft",
     format_item = function(action)
-      return action.label .. " — " .. action.description
+      return action.label .. "  " .. action.description
     end,
-  }, util.guard(select))
+  }, select)
 end
 
 function M.browse()
@@ -206,16 +213,16 @@ M.bindings = {
   {
     "<leader>ww",
     function()
-      M.menu()
+      M.open()
     end,
-    "Open Weft command centre",
+    "Open full task workspace",
   },
   {
     "<leader>wW",
     function()
-      M.open()
+      M.menu()
     end,
-    "Open full task workspace",
+    "Open Weft command centre",
   },
   {
     "<leader>wa",

@@ -402,7 +402,7 @@ function M.pick_model(task)
     end
     return a > b
   end)
-  vim.ui.select(
+  require("weft").select(
     names,
     {
       prompt = "Weft · " .. task.name .. " · model",

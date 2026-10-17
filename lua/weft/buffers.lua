@@ -76,7 +76,7 @@ function M.load(task, path)
 end
 
 function M.pick(task)
-  vim.ui.select(M.list(task), {
+  require("weft").select(M.list(task), {
     prompt = "Weft · " .. task.name .. " · buffers",
     format_item = function(buffer)
       return (vim.bo[buffer].modified and "● " or "  ")

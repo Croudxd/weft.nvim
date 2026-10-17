@@ -96,6 +96,11 @@ function M.write(task, args)
   end
   changes.record(task, path, before, after)
   require("weft.ui").refresh_changes(task)
+  if require("weft").config.open_changed_files and not dirty and not (args.action == "delete") then
+    vim.schedule(function()
+      require("weft.ui").source(task, buffer)
+    end)
+  end
   return {
     path = args.path,
     hash = after and vim.fn.sha256(after) or "missing",

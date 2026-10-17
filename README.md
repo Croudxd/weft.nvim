@@ -111,13 +111,12 @@ not an account-entitlement list; availability depends on your ChatGPT account.
 Creating a task opens its full workspace automatically and focuses chat. If
 you reach a task home buffer, press **Enter** to open the workspace.
 
-**`<leader>ww`** opens a searchable Weft command centre. With Telescope
-installed it uses a Telescope picker; otherwise it uses your configured
-`vim.ui.select` picker. From there, open the workspace, chat, changes, buffers,
-or switch/create a task. **`<leader>wW`** or **`:Weft open`** opens the full
-workspace directly: source/home in the centre, changes on the left, and chat on
-the right. Calling it again keeps those panels open without adding duplicates.
-Previous-code previews remain available on demand with `<leader>wo`.
+**`<leader>ww`** opens the full workspace directly: source/home in the centre,
+changes on the left, and chat on the right. Outside a task it opens a searchable
+task picker. With Telescope installed, all Weft pickers (tasks, buffers, models,
+and the command centre) use Telescope; otherwise they use your configured
+`vim.ui.select` picker. Set `picker` to provide any picker implementation you
+prefer. Previous-code previews remain available on demand with `<leader>wo`.
 
 Repository registration persists outside your project. `:Weft repo` lists the
 configured originals; `:Weft repo remove NAME` removes a repository from future
@@ -179,8 +178,8 @@ bindings are grouped under **w**, leaving existing AI plugin bindings alone.
 
 | Binding | Action |
 | --- | --- |
-| `<leader>ww` | Open searchable Weft command centre |
-| `<leader>wW` | Open full task workspace |
+| `<leader>ww` | Open full task workspace |
+| `<leader>wW` | Open searchable Weft command centre |
 | `<leader>wm` | Pick task model |
 | `<leader>wa` | Pick task / agent |
 | `<leader>wn` | Create task / agent |
@@ -219,6 +218,8 @@ require("weft").setup({
   command_timeout = 120000,
   model = "gpt-5.3-codex",
   mappings = true,
+  open_changed_files = false, -- Set true to focus each agent-written file as it is saved
+  -- picker = function(items, options, callback) ... end, -- Optional picker integration
   -- browser = function(root) ... end, -- Override workspace-root browsing
 })
 ```
