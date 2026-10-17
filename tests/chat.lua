@@ -53,6 +53,7 @@ local function run()
   require("codecompanion").setup(agent.codecompanion_options())
   local adapters = require("codecompanion.adapters")
   local adapter = adapters.resolve("weft_codex")
+  equal(require("codecompanion.adapters.utils").model(adapter), "gpt-5.3-codex")
   local parameters = adapters.call_handler(
     adapter,
     "build_parameters",
@@ -129,6 +130,7 @@ local function run()
     require("weft").open(tasks[name])
     equal(#vim.api.nvim_tabpage_list_wins(0), windows)
     local chat = agent.get(tasks[name])
+    equal(chat.settings.model, "gpt-5.3-codex")
     local last = vim.api.nvim_buf_line_count(chat.bufnr)
     vim.api.nvim_buf_set_lines(
       chat.bufnr,
@@ -188,6 +190,9 @@ local function run()
   print("PASS background commands use their chat's task directory rather than the active tab")
 
   require("weft.workspace").switch(tasks.alpha)
+  agent.set_model(tasks.alpha, "gpt-5.4")
+  equal(chat.settings.model, "gpt-5.4")
+  equal(agent.get(tasks.beta).settings.model, "gpt-5.3-codex")
   agent.save(tasks.alpha)
   local function conversation(current)
     local result = {}
@@ -202,6 +207,7 @@ local function run()
   chat:close()
   agent.chats.alpha = nil
   local restored = agent.get(tasks.alpha)
+  equal(restored.settings.model, "gpt-5.4")
   equal(conversation(restored), original_messages)
   equal(vim.b[restored.bufnr].weft_task, "alpha")
   require("weft.ui").source(tasks.alpha, vim.fn.bufnr(tasks.alpha.root .. "/app/source.lua"))

@@ -81,6 +81,10 @@ Authenticate in your browser when prompted. Write an instruction in the chat
 and press **Ctrl-S** or **`<leader>ws`** to send it. Saving a file does not submit
 a prompt. Use **`<leader>wk`** to stop the current task's agent.
 
+The default model is `gpt-5.3-codex`. Use `:Weft model MODEL` to change the
+current task's model; the choice persists for that task. `:Weft model` resets
+it to the configured default. Model access depends on your ChatGPT account.
+
 Creating a task opens its full workspace automatically and focuses chat. If
 you reach a task home buffer, press **Enter** to open the workspace.
 
@@ -182,6 +186,7 @@ require("weft").setup({
   poll_interval = 2000, -- Milliseconds; 0 disables background reconciliation
   max_file_bytes = 1024 * 1024,
   command_timeout = 120000,
+  model = "gpt-5.3-codex",
   mappings = true,
   -- browser = function(root) ... end, -- Override workspace-root browsing
 })

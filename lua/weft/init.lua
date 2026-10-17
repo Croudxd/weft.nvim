@@ -11,6 +11,7 @@ local defaults = {
   poll_interval = 2000,
   max_file_bytes = 1024 * 1024,
   command_timeout = 120000,
+  model = "gpt-5.3-codex",
   mappings = true,
 }
 
@@ -278,6 +279,10 @@ local function command(args)
     return util.notify(vim.inspect(store.repositories))
   end
   local actions = {
+    model = function()
+      M.config.load_chat()
+      require("weft.agent").set_model(current(), args.fargs[2] or M.config.model)
+    end,
     open = M.open,
     chat = function()
       require("weft.agent").toggle(current())
@@ -378,6 +383,7 @@ function M.setup(options)
         "hide",
         "help",
         "auth",
+        "model",
       }
     end,
     desc = "Weft task workspaces and AI coding",

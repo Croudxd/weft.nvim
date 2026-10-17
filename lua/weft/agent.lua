@@ -48,7 +48,12 @@ function M.codex_adapter()
       end
     end
   end
-  return require("codecompanion.adapters").extend(vim.deepcopy(M.adapter), {})
+  local adapters = require("codecompanion.adapters")
+  local definition = vim.deepcopy(M.adapter)
+  definition.type = "http"
+  local adapter = adapters.extend(definition, {})
+  local config = require("weft").config
+  return adapters.set_model({ adapter = adapter, model = config and config.model or "gpt-5.3-codex" })
 end
 
 function M.codecompanion_options()
@@ -115,7 +120,9 @@ function M.get(task)
   require("codecompanion")
   local saved = util.load_json(store.task_directory(task) .. "/chat.json", nil)
   chat = require("codecompanion.interactions.chat").new({
-    adapter = "weft_codex",
+    adapter = require("codecompanion.adapters").resolve("weft_codex", {
+      model = task.model or require("weft").config.model,
+    }),
     title = "Weft · " .. task.name,
     hidden = true,
     buffer_context = require("codecompanion.utils.context").get(),
@@ -206,6 +213,16 @@ function M.stop(task)
   if chat then
     chat:stop()
   end
+end
+
+function M.set_model(task, model)
+  local chat = M.get(task)
+  assert(not chat.current_request, "Stop the current request before switching models")
+  chat:change_model({ model = model })
+  task.model = model
+  store.save()
+  M.save(task)
+  util.notify("Model for " .. task.name .. ": " .. model)
 end
 
 function M.attach(task)
