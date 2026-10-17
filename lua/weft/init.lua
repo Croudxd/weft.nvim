@@ -36,6 +36,7 @@ function M.new(name)
     workspace.switch(task)
     require("weft.changes").scan(task)
     util.notify("Created task " .. task.name .. " · " .. #task.repositories .. " repositories")
+    util.guard(M.open)(task)
   end)
 end
 

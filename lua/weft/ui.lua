@@ -64,8 +64,10 @@ function M.home(task)
     table.insert(lines, "  " .. repository.name .. " · " .. repository.branch)
   end
   vim.list_extend(lines, {
-    "",
-    "<leader>ww  Open full workspace",
+      "",
+      "Press Enter to open your chat and changes.",
+      "",
+      "<leader>ww  Open full workspace",
     "<leader>wc  Chat",
     "<leader>wl  Changes",
     "<leader>wb  Task buffers",
@@ -75,6 +77,9 @@ function M.home(task)
   local buffer = scratch(task, "home", lines)
   vim.api.nvim_win_set_buf(0, buffer)
   views(task).home = { buffer = buffer, window = vim.api.nvim_get_current_win() }
+  vim.keymap.set("n", "<CR>", util.guard(function()
+    require("weft").open(task)
+  end), { buffer = buffer, desc = "Open Weft workspace" })
 end
 
 function M.source(task, buffer)

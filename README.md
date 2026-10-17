@@ -81,6 +81,9 @@ Authenticate in your browser when prompted. Write an instruction in the chat
 and press **Ctrl-S** or **`<leader>ws`** to send it. Saving a file does not submit
 a prompt. Use **`<leader>wk`** to stop the current task's agent.
 
+Creating a task opens its full workspace automatically and focuses chat. If
+you reach a task home buffer, press **Enter** to open the workspace.
+
 **`<leader>ww`** or **`:Weft open`** opens the full workspace: source/home in
 the centre, changes on the left, and chat on the right. Calling it again keeps
 those panels open without adding duplicates. Outside a task it asks you to pick
