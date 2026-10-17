@@ -125,9 +125,14 @@ local function run()
   local requests = {}
   local http = require("codecompanion.http")
   local real_new = http.new
-  http.new = function()
+  http.new = function(options)
     return {
       send = function(_, payload, callbacks)
+        local sent_parameters = adapters.call_handler(options.adapter, "build_parameters", {
+          params = options.adapter.parameters,
+          messages = payload.messages,
+        })
+        equal(sent_parameters.model, options.adapter.schema.model.default)
         local request_tools = adapters.call_handler(adapter, "build_tools", { tools = payload.tools })
         assert(request_tools and request_tools.tools, "Request has no workspace tools")
         local workspace_tool = false
@@ -435,6 +440,19 @@ local function run()
   )
   assert(not recovered_text:find('"hash"', 1, true), "Display recovery exposed raw tool JSON")
   print("PASS blank fresh, live, and saved chat displays recover without losing message history")
+  recovered:change_model({ model = "gpt-6-astra" })
+  agent.save(tasks.alpha)
+  equal(tasks.alpha.model, "gpt-6-astra")
+  equal(util.load_json(chat_path).model, "gpt-6-astra")
+  recovered:close()
+  agent.chats.alpha = nil
+  tasks.alpha.model = nil -- the conversation must retain its model independently
+  local model_restored = agent.get(tasks.alpha)
+  equal(model_restored.settings.model, "gpt-6-astra")
+  equal(model_restored.adapter.schema.model.default, "gpt-6-astra")
+  print(
+    "PASS native model selections persist in the task and chat snapshot rather than reverting to the default"
+  )
   http.new = real_new
 end
 

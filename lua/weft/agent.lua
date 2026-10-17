@@ -129,7 +129,13 @@ function M.save(task)
     return
   end
   M.repair_display(chat)
+  local model = chat.settings.model
+  if model and task.model ~= model then
+    task.model = model
+    store.save()
+  end
   util.save_json(store.task_directory(task) .. "/chat.json", {
+    model = model,
     messages = chat.messages,
     lines = vim.api.nvim_buf_get_lines(chat.bufnr, 0, -1, false),
     header_line = chat.header_line,
@@ -238,7 +244,7 @@ function M.get(task)
   local saved = util.load_json(store.task_directory(task) .. "/chat.json", nil)
   chat = require("codecompanion.interactions.chat").new({
     adapter = require("codecompanion.adapters").resolve("weft_codex", {
-      model = task.model or require("weft").config.model,
+      model = (saved and saved.model) or task.model or require("weft").config.model,
     }),
     title = "Weft · " .. task.name,
     hidden = true,
