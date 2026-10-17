@@ -128,6 +128,7 @@ function M.save(task)
   if not chat or not vim.api.nvim_buf_is_valid(chat.bufnr) then
     return
   end
+  M.repair_display(chat)
   util.save_json(store.task_directory(task) .. "/chat.json", {
     messages = chat.messages,
     lines = vim.api.nvim_buf_get_lines(chat.bufnr, 0, -1, false),
@@ -158,13 +159,16 @@ local function prompt(task)
 end
 
 local function clean_saved_display(chat, saved)
-  if saved.display_version == 2 then
+  local lines = saved.lines or {}
+  local blank = vim.trim(table.concat(lines, "\n")) == ""
+  if saved.display_version == 2 and not blank then
     return
   end
-  local lines = saved.lines or {}
   local header = saved.header_line or 1
   local draft
-  if lines[header] and lines[header]:match("^## ") and saved.last_role == "user" then
+  if blank then
+    draft = {}
+  elseif lines[header] and lines[header]:match("^## ") and saved.last_role == "user" then
     draft = vim.list_slice(lines, header + 1)
   elseif #saved.messages <= 2 then
     -- A fresh chat whose heading was overwritten by a paste.
@@ -201,6 +205,14 @@ local function clean_saved_display(chat, saved)
   chat.builder.state = { last_role = "user", current_header_line = row }
 end
 
+function M.repair_display(chat)
+  local lines = vim.api.nvim_buf_get_lines(chat.bufnr, 0, -1, false)
+  if chat.current_request or vim.trim(table.concat(lines, "\n")) ~= "" then
+    return
+  end
+  clean_saved_display(chat, { lines = lines, messages = chat.messages })
+end
+
 local function ensure_workspace_tool(chat)
   local registry = chat.tool_registry
   local name = "weft_workspace"
@@ -219,6 +231,7 @@ end
 function M.get(task)
   local chat = M.chats[task.id]
   if chat and vim.api.nvim_buf_is_valid(chat.bufnr) then
+    M.repair_display(chat)
     return chat
   end
   require("codecompanion")

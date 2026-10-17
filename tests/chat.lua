@@ -24,7 +24,10 @@ local function run()
   local startup = require("weft.agent").codecompanion_options()
   assert(startup.interactions.chat.opts.context_management.enabled, "Pre-setup context defaults missing")
   require("codecompanion").setup(startup)
-  assert(require("codecompanion.config").adapters.http.weft_codex, "Adapter missing after dependency-first setup")
+  assert(
+    require("codecompanion.config").adapters.http.weft_codex,
+    "Adapter missing after dependency-first setup"
+  )
   print("PASS CodeCompanion can initialize before Weft setup, as it does under lazy.nvim")
   util.git(original, { "init", "-b", "main" })
   util.git(original, { "config", "user.name", "Weft Test" })
@@ -242,6 +245,12 @@ local function run()
 
   require("weft.workspace").switch(tasks.cancelled)
   local cancelled_chat = agent.get(tasks.cancelled)
+  vim.api.nvim_buf_set_lines(cancelled_chat.bufnr, 0, -1, false, {})
+  agent.get(tasks.cancelled)
+  assert(
+    require("codecompanion.interactions.chat.parser").headers(cancelled_chat) ~= nil,
+    "Fresh blank chat did not recover its input heading"
+  )
   local last_line = vim.api.nvim_buf_line_count(cancelled_chat.bufnr)
   vim.api.nvim_buf_set_lines(cancelled_chat.bufnr, last_line - 1, last_line, false, { "Edit the file." })
   agent.send(tasks.cancelled)
@@ -402,6 +411,30 @@ local function run()
   yaml:parse(true)
   assert(yaml:children().yaml, "Trailing-slash YAML fence was not highlighted as YAML")
   print("PASS changes selection survives refresh, Enter opens the file, and YAML previews resolve correctly")
+  local history = conversation(restored)
+  vim.api.nvim_buf_set_lines(restored.bufnr, 0, -1, false, {})
+  agent.save(tasks.alpha)
+  local chat_path = require("weft.store").task_directory(tasks.alpha) .. "/chat.json"
+  local snapshot = util.load_json(chat_path)
+  assert(vim.trim(table.concat(snapshot.lines, "\n")) ~= "", "Save persisted an empty chat display")
+  snapshot.lines = { "" }
+  snapshot.header_line = 999
+  util.save_json(chat_path, snapshot)
+  restored:close()
+  agent.chats.alpha = nil
+  local recovered = agent.get(tasks.alpha)
+  equal(conversation(recovered), history)
+  assert(
+    require("codecompanion.interactions.chat.parser").headers(recovered) ~= nil,
+    "Saved blank chat did not recover its Me heading"
+  )
+  local recovered_text = table.concat(vim.api.nvim_buf_get_lines(recovered.bufnr, 0, -1, false), "\n")
+  assert(
+    recovered_text:find("Finished alpha", 1, true),
+    "Saved blank chat did not recover assistant responses"
+  )
+  assert(not recovered_text:find('"hash"', 1, true), "Display recovery exposed raw tool JSON")
+  print("PASS blank fresh, live, and saved chat displays recover without losing message history")
   http.new = real_new
 end
 
