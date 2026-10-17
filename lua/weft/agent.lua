@@ -55,18 +55,41 @@ function M.codex_adapter()
   end
   definition.type = "http"
   local adapter = adapters.extend(definition, {})
+  -- The upstream OAuth adapter has no context-window metadata. Supplying the
+  -- documented Codex window lets CodeCompanion compact before prompts grow slow
+  -- or hit the provider limit.
+  for _, model in pairs(adapter.schema.model.choices) do
+    model.meta = model.meta or { context_window = 272000 }
+  end
   local config = require("weft").config
   return adapters.set_model({ adapter = adapter, model = config and config.model or "gpt-5.3-codex" })
 end
 
 function M.codecompanion_options()
+  local context = require("weft").config.context
   return {
     adapters = { http = { weft_codex = M.codex_adapter } },
     interactions = {
       chat = {
         adapter = "weft_codex",
+        opts = {
+          context_management = {
+            enabled = context.compact,
+            editing = {
+              trigger = context.edit_threshold,
+              exclude_tools = {},
+              keep_cycles = context.keep_tool_cycles,
+            },
+            compaction = {
+              trigger = context.compact_threshold,
+              min_token_savings = 10000,
+              adapter = nil,
+              fallback_to_chat_adapter = true,
+            },
+          },
+          completion_provider = "default",
+        },
         tools = { weft_workspace = { path = "weft.tools", description = "Operate in this task's workspace" } },
-        opts = { completion_provider = "default" },
         keymaps = {
           send = { modes = { n = "<C-s>", i = "<C-s>" } },
           close = false,

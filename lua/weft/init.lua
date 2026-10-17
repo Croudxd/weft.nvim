@@ -15,6 +15,12 @@ local defaults = {
   mappings = true,
   open_changed_files = false,
   tabline = false,
+  context = {
+    compact = true,
+    compact_threshold = 0.75,
+    edit_threshold = 0.6,
+    keep_tool_cycles = 3,
+  },
 }
 
 local function render_tabline()
@@ -27,6 +33,11 @@ local function render_tabline()
     table.insert(labels, (tab == vim.api.nvim_get_current_tabpage() and "%#TabLineSel#" or "%#TabLine#") .. " " .. index .. " " .. label .. " ")
   end
   return table.concat(labels) .. "%#TabLineFill#"
+end
+
+local function current()
+  local task = assert(workspace.current(), "Choose a Weft task first: :Weft tasks")
+  return task
 end
 
 function M.new(name)

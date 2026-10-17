@@ -249,6 +249,21 @@ local function run()
     end, "Git metadata")
     equal(files.resolve(task_a, "."), task_a.root)
   end)
+  test("source view leaves unrelated note buffers alone and shows line numbers", function()
+    local notes = vim.api.nvim_create_buf(true, true)
+    vim.api.nvim_buf_set_name(notes, sandbox .. "/notes.md")
+    vim.api.nvim_win_set_buf(0, notes)
+    require("weft.ui").source(task_a, vim.fn.bufnr(path_a))
+    assert(vim.api.nvim_win_get_buf(0) ~= notes)
+    equal(vim.api.nvim_win_get_buf(0), vim.fn.bufnr(path_a))
+    assert(vim.wo.number)
+    assert(not vim.wo.relativenumber)
+    local note_found = false
+    for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
+      note_found = note_found or buffer == notes
+    end
+    assert(note_found, "Weft replaced the note buffer")
+  end)
   test("switching tasks preserves dirty buffers and independent tab-local roots", function()
     local workspace = require("weft.workspace")
     workspace.switch(task_a)

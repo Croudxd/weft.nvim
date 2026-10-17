@@ -89,9 +89,11 @@ function M.source(task, buffer)
     require("weft.workspace").switch(task)
   end
   local destination
+  -- Only replace a source/home window already owned by this task. Ordinary
+  -- buffers (notes, terminals, help) must never be commandeered by Weft.
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
     local candidate = vim.api.nvim_win_get_buf(win)
-    if vim.bo[candidate].buftype == "" or vim.b[candidate].weft_view == "home" then
+    if vim.b[candidate].weft_task == task.id and (vim.bo[candidate].buftype == "" or vim.b[candidate].weft_view == "home") then
       destination = win
       break
     end
@@ -102,6 +104,8 @@ function M.source(task, buffer)
   end
   vim.api.nvim_set_current_win(destination)
   vim.api.nvim_win_set_buf(destination, buffer)
+  vim.wo[destination].number = true
+  vim.wo[destination].relativenumber = false
   vim.wo[destination].signcolumn = "yes:1"
 end
 

@@ -221,6 +221,12 @@ require("weft").setup({
   mappings = true,
   open_changed_files = false, -- Set true to focus each agent-written file as it is saved
   tabline = false, -- Set true for Weft's task-named built-in tabline
+  context = {
+    compact = true, -- Summarize safely before long chats slow down or overflow
+    compact_threshold = 0.75, -- Fraction of the model context window
+    edit_threshold = 0.6, -- Trim old tool outputs before compacting
+    keep_tool_cycles = 3,
+  },
   -- picker = function(items, options, callback) ... end, -- Optional picker integration
   -- browser = function(root) ... end, -- Override workspace-root browsing
 })
