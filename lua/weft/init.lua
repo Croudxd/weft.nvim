@@ -39,7 +39,7 @@ function M.new(name)
   end)
 end
 
-function M.tasks()
+function M.tasks(on_selected)
   local tasks = vim.tbl_values(store.tasks)
   table.sort(tasks, function(a, b)
     return a.name < b.name
@@ -58,9 +58,23 @@ function M.tasks()
     util.guard(function(task)
       if task then
         workspace.switch(task)
+        if on_selected then
+          on_selected(task)
+        end
       end
     end)
   )
+end
+
+function M.open(task)
+  task = task or workspace.current()
+  if not task then
+    return M.tasks(function(selected)
+      M.open(selected)
+    end)
+  end
+  M.config.load_chat()
+  require("weft.ui").open(task)
 end
 
 function M.browse()
@@ -94,6 +108,13 @@ function M.hide()
 end
 
 M.bindings = {
+  {
+    "<leader>ww",
+    function()
+      M.open()
+    end,
+    "Open full task workspace",
+  },
   {
     "<leader>wa",
     function()
@@ -256,6 +277,7 @@ local function command(args)
     return util.notify(vim.inspect(store.repositories))
   end
   local actions = {
+    open = M.open,
     chat = function()
       require("weft.agent").toggle(current())
     end,
@@ -340,6 +362,7 @@ function M.setup(options)
     nargs = "*",
     complete = function()
       return {
+        "open",
         "new",
         "tasks",
         "repo",

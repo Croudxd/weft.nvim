@@ -74,12 +74,17 @@ Weft's workspace layer can be used without chat dependencies.
 :Weft repo add ~/dev/infrastructure
 :Weft auth
 :Weft new fix-timeouts
-:Weft chat
+:Weft open
 ```
 
 Authenticate in your browser when prompted. Write an instruction in the chat
 and press **Ctrl-S** or **`<leader>ws`** to send it. Saving a file does not submit
 a prompt. Use **`<leader>wk`** to stop the current task's agent.
+
+**`<leader>ww`** or **`:Weft open`** opens the full workspace: source/home in
+the centre, changes on the left, and chat on the right. Calling it again keeps
+those panels open without adding duplicates. Outside a task it asks you to pick
+one first. Previous-code previews remain available on demand with `<leader>wo`.
 
 Repository registration persists outside your project. `:Weft repo` lists the
 configured originals; `:Weft repo remove NAME` removes a repository from future
@@ -138,6 +143,7 @@ bindings are grouped under **w**, leaving existing AI plugin bindings alone.
 
 | Binding | Action |
 | --- | --- |
+| `<leader>ww` | Open full task workspace |
 | `<leader>wa` | Pick task / agent |
 | `<leader>wn` | Create task / agent |
 | `<leader>wc` | Toggle task chat |

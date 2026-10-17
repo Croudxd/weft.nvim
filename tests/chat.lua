@@ -123,7 +123,11 @@ local function run()
 
   for _, name in ipairs({ "alpha", "beta" }) do
     require("weft.workspace").switch(tasks[name])
-    agent.toggle(tasks[name])
+    require("weft").open(tasks[name])
+    local windows = #vim.api.nvim_tabpage_list_wins(0)
+    equal(windows, 3)
+    require("weft").open(tasks[name])
+    equal(#vim.api.nvim_tabpage_list_wins(0), windows)
     local chat = agent.get(tasks[name])
     local last = vim.api.nvim_buf_line_count(chat.bufnr)
     vim.api.nvim_buf_set_lines(

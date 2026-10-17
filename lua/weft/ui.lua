@@ -63,17 +63,15 @@ function M.home(task)
   for _, repository in ipairs(task.repositories) do
     table.insert(lines, "  " .. repository.name .. " · " .. repository.branch)
   end
-  vim.list_extend(
-    lines,
-    {
-      "",
-      "<leader>wc  Chat",
-      "<leader>wl  Changes",
-      "<leader>wb  Task buffers",
-      "<leader>we  Browse workspace",
-      "<leader>w?  All shortcuts",
-    }
-  )
+  vim.list_extend(lines, {
+    "",
+    "<leader>ww  Open full workspace",
+    "<leader>wc  Chat",
+    "<leader>wl  Changes",
+    "<leader>wb  Task buffers",
+    "<leader>we  Browse workspace",
+    "<leader>w?  All shortcuts",
+  })
   local buffer = scratch(task, "home", lines)
   vim.api.nvim_win_set_buf(0, buffer)
   views(task).home = { buffer = buffer, window = vim.api.nvim_get_current_win() }
@@ -137,12 +135,16 @@ function M.refresh_changes(task)
   vim.bo[view.buffer].modifiable = false
 end
 
-function M.changes(task)
+function M.changes(task, options)
+  if options and options.open and window(task, "changes") then
+    return
+  end
   if M.hide(task, "changes") then
     return
   end
   local buffer = scratch(task, "changes", {})
-  vim.cmd("topleft 42vsplit")
+  local width = math.min(42, math.max(20, math.floor(vim.o.columns * 0.24)))
+  vim.cmd("topleft " .. width .. "vsplit")
   vim.api.nvim_win_set_buf(0, buffer)
   views(task).changes = { buffer = buffer, window = vim.api.nvim_get_current_win() }
   local function selected()
@@ -177,6 +179,32 @@ function M.changes(task)
   end, { buffer = buffer })
   M.refresh_changes(task)
   require("weft.changes").scan(task)
+end
+
+function M.open(task)
+  require("weft.workspace").switch(task)
+  local has_source = false
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local buffer = vim.api.nvim_win_get_buf(win)
+    if
+      vim.b[buffer].weft_task == task.id
+      and (vim.bo[buffer].buftype == "" or vim.b[buffer].weft_view == "home")
+    then
+      has_source = true
+      break
+    end
+  end
+  if not has_source then
+    local buffer = require("weft.buffers").list(task)[1]
+    if buffer then
+      M.source(task, buffer)
+    else
+      vim.cmd("aboveleft vsplit")
+      M.home(task)
+    end
+  end
+  M.changes(task, { open = true })
+  require("weft.agent").toggle(task, { open = true })
 end
 
 function M.before(task, entry, index)

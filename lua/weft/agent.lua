@@ -164,10 +164,14 @@ function M.get(task)
   return chat
 end
 
-function M.toggle(task)
+function M.toggle(task, options)
   local chat = M.get(task)
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
     if vim.api.nvim_win_get_buf(win) == chat.bufnr then
+      if options and options.open then
+        vim.api.nvim_set_current_win(win)
+        return
+      end
       M.save(task)
       if #vim.api.nvim_tabpage_list_wins(0) == 1 then
         require("weft.ui").home(task)
