@@ -16,7 +16,8 @@ local defaults = {
 }
 
 local function current()
-  return assert(workspace.current(), "Choose a Weft task first: :Weft tasks")
+  local task = assert(workspace.current(), "Choose a Weft task first: :Weft tasks")
+  return task
 end
 
 function M.new(name)

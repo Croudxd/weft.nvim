@@ -265,6 +265,19 @@ local function run()
   equal(vim.b[restored.bufnr].weft_task, "alpha")
   require("weft.ui").source(tasks.alpha, vim.fn.bufnr(tasks.alpha.root .. "/app/source.lua"))
   agent.attach(tasks.alpha)
+  vim.cmd("Weft before")
+  local preview = require("weft.ui").views[tasks.alpha.id].before
+  assert(
+    preview and vim.api.nvim_win_is_valid(preview.window),
+    "Previous-code command did not open a preview"
+  )
+  assert(vim.api.nvim_buf_get_lines(preview.buffer, 0, -1, false)[1], "Previous-code preview is empty")
+  vim.cmd("Weft before")
+  assert(
+    not require("weft.ui").views[tasks.alpha.id].before.window,
+    "Previous-code command did not hide its preview"
+  )
+  print("PASS previous-code command opens and toggles the source file preview")
   print("PASS task chats persist outside repositories and restore with buffer attachments")
   http.new = real_new
 end
