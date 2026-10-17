@@ -80,6 +80,90 @@ function M.open(task)
   require("weft.ui").open(task)
 end
 
+-- The command centre is deliberately optional-Telescope: Weft should remain
+-- usable with a configured vim.ui.select implementation, while Telescope users
+-- get a proper searchable picker instead of a scratch-buffer landing page.
+function M.menu()
+  local task = workspace.current()
+  local actions = {}
+  local function add(label, description, callback)
+    table.insert(actions, { label = label, description = description, callback = callback })
+  end
+
+  if task then
+    add("Open workspace", "Chat, changes, and source files for " .. task.name, function()
+      M.open(task)
+    end)
+    add("Open chat", "Talk to the agent for " .. task.name, function()
+      M.config.load_chat()
+      require("weft.agent").toggle(task, { open = true })
+    end)
+    add("Review changes", "Browse files changed in " .. task.name, function()
+      require("weft.ui").changes(task, { open = true })
+    end)
+    add("Task buffers", "Switch between source buffers", function()
+      require("weft.buffers").pick(task)
+    end)
+    add("Browse workspace", "Open the task root in your file browser", function()
+      M.browse()
+    end)
+    add("Choose model", "Change the model for this task", function()
+      M.config.load_chat()
+      require("weft.agent").pick_model(task)
+    end)
+  end
+  add("Switch task", "Choose another Weft task", function()
+    M.tasks()
+  end)
+  add("New task", "Create an isolated worktree and agent", function()
+    M.new()
+  end)
+
+  local function select(action)
+    if action then
+      action.callback()
+    end
+  end
+  local ok, telescope = pcall(require, "telescope")
+  if ok then
+    local pickers = require("telescope.pickers")
+    local finders = require("telescope.finders")
+    local config = require("telescope.config").values
+    local actions_module = require("telescope.actions")
+    local action_state = require("telescope.actions.state")
+    return pickers
+      .new({}, {
+        prompt_title = task and "Weft · " .. task.name or "Weft",
+        finder = finders.new_table({
+          results = actions,
+          entry_maker = function(action)
+            return {
+              value = action,
+              display = action.label .. "  " .. action.description,
+              ordinal = action.label .. " " .. action.description,
+            }
+          end,
+        }),
+        sorter = config.generic_sorter({}),
+        attach_mappings = function(prompt_buffer)
+          actions_module.select_default:replace(function()
+            local selection = action_state.get_selected_entry()
+            actions_module.close(prompt_buffer)
+            select(selection and selection.value)
+          end)
+          return true
+        end,
+      })
+      :find()
+  end
+  vim.ui.select(actions, {
+    prompt = task and "Weft · " .. task.name or "Weft",
+    format_item = function(action)
+      return action.label .. " — " .. action.description
+    end,
+  }, util.guard(select))
+end
+
 function M.browse()
   local task = current()
   if M.config.browser then
@@ -121,6 +205,13 @@ M.bindings = {
   },
   {
     "<leader>ww",
+    function()
+      M.menu()
+    end,
+    "Open Weft command centre",
+  },
+  {
+    "<leader>wW",
     function()
       M.open()
     end,

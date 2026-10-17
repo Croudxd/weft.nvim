@@ -111,10 +111,13 @@ not an account-entitlement list; availability depends on your ChatGPT account.
 Creating a task opens its full workspace automatically and focuses chat. If
 you reach a task home buffer, press **Enter** to open the workspace.
 
-**`<leader>ww`** or **`:Weft open`** opens the full workspace: source/home in
-the centre, changes on the left, and chat on the right. Calling it again keeps
-those panels open without adding duplicates. Outside a task it asks you to pick
-one first. Previous-code previews remain available on demand with `<leader>wo`.
+**`<leader>ww`** opens a searchable Weft command centre. With Telescope
+installed it uses a Telescope picker; otherwise it uses your configured
+`vim.ui.select` picker. From there, open the workspace, chat, changes, buffers,
+or switch/create a task. **`<leader>wW`** or **`:Weft open`** opens the full
+workspace directly: source/home in the centre, changes on the left, and chat on
+the right. Calling it again keeps those panels open without adding duplicates.
+Previous-code previews remain available on demand with `<leader>wo`.
 
 Repository registration persists outside your project. `:Weft repo` lists the
 configured originals; `:Weft repo remove NAME` removes a repository from future
@@ -176,7 +179,8 @@ bindings are grouped under **w**, leaving existing AI plugin bindings alone.
 
 | Binding | Action |
 | --- | --- |
-| `<leader>ww` | Open full task workspace |
+| `<leader>ww` | Open searchable Weft command centre |
+| `<leader>wW` | Open full task workspace |
 | `<leader>wm` | Pick task model |
 | `<leader>wa` | Pick task / agent |
 | `<leader>wn` | Create task / agent |
