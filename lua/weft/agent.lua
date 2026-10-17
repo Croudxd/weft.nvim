@@ -50,10 +50,12 @@ function M.codex_adapter()
   end
   local adapters = require("codecompanion.adapters")
   local definition = vim.deepcopy(M.adapter)
+  definition.type = "http"
+  -- Only add model names obtained from the upstream Codex catalogue (or its
+  -- persisted cache); Weft never invents model identifiers.
   for _, name in ipairs(require("weft.models").names()) do
     definition.schema.model.choices[name] = definition.schema.model.choices[name] or {}
   end
-  definition.type = "http"
   local adapter = adapters.extend(definition, {})
   -- The upstream OAuth adapter has no context-window metadata. Supplying the
   -- documented Codex window lets CodeCompanion compact before prompts grow slow
@@ -412,13 +414,15 @@ end
 
 function M.model_names()
   local adapter = M.codex_adapter()
-  local choices = adapter.schema.model.choices
-  if type(choices) == "function" then
-    choices = choices(adapter)
-  end
-  local names = {}
-  for name in pairs(choices or {}) do
+  local names, seen = {}, {}
+  for name in pairs(adapter.schema.model.choices or {}) do
+    seen[name] = true
     table.insert(names, name)
+  end
+  for _, name in ipairs(require("weft.models").names()) do
+    if not seen[name] then
+      table.insert(names, name)
+    end
   end
   table.sort(names)
   return names

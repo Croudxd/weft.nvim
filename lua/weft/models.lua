@@ -1,15 +1,5 @@
 local M = {}
 local url = "https://raw.githubusercontent.com/openai/codex/main/codex-rs/models-manager/models.json"
-local bundled = {
-  "gpt-6-astra",
-  "gpt-6.1-sol",
-  "gpt-6-sol",
-  "gpt-6-luna",
-  "gpt-5.6-sol",
-  "gpt-5.6-terra",
-  "gpt-5.6-luna",
-  "gpt-5.5",
-}
 
 local function cache_path()
   return require("weft").config.state_dir .. "/models.json"
@@ -38,7 +28,7 @@ function M.names()
   if not M.catalogue then
     local loaded, data = pcall(require("weft.util").load_json, cache_path())
     local ok, names = pcall(M.parse, loaded and data or nil)
-    M.catalogue = ok and names or vim.deepcopy(bundled)
+    M.catalogue = ok and names or {}
   end
   return vim.deepcopy(M.catalogue)
 end

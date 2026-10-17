@@ -25,11 +25,15 @@ function M.owner(path)
     return nil
   end
   path = util.path(path)
+  local owner
+  -- Task roots can be nested by a user's chosen names/storage layout. Always
+  -- use the most-specific match instead of Lua table iteration order.
   for _, task in pairs(M.tasks) do
-    if util.inside(path, task.root) then
-      return task
+    if util.inside(path, task.root) and (not owner or #task.root > #owner.root) then
+      owner = task
     end
   end
+  return owner
 end
 
 function M.repository(task, path)

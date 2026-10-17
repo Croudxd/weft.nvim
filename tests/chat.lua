@@ -84,7 +84,7 @@ local function run()
   print("PASS real Codex adapter request builders match CodeCompanion's handler contract")
   equal(vim.fn.getcompletion("Weft model gpt-5.3", "cmdline"), { "gpt-5.3-codex" })
   equal(vim.fn.getcompletion("Weft model def", "cmdline"), { "default" })
-  equal(vim.fn.getcompletion("Weft model gpt-6-as", "cmdline"), { "gpt-6-astra" })
+  equal(vim.fn.getcompletion("Weft model gpt-6-as", "cmdline"), {})
   local models = require("weft.models")
   equal(
     models.parse({
@@ -440,16 +440,16 @@ local function run()
   )
   assert(not recovered_text:find('"hash"', 1, true), "Display recovery exposed raw tool JSON")
   print("PASS blank fresh, live, and saved chat displays recover without losing message history")
-  recovered:change_model({ model = "gpt-6-astra" })
+  recovered:change_model({ model = "gpt-5.4" })
   agent.save(tasks.alpha)
-  equal(tasks.alpha.model, "gpt-6-astra")
-  equal(util.load_json(chat_path).model, "gpt-6-astra")
+  equal(tasks.alpha.model, "gpt-5.4")
+  equal(util.load_json(chat_path).model, "gpt-5.4")
   recovered:close()
   agent.chats.alpha = nil
   tasks.alpha.model = nil -- the conversation must retain its model independently
   local model_restored = agent.get(tasks.alpha)
-  equal(model_restored.settings.model, "gpt-6-astra")
-  equal(model_restored.adapter.schema.model.default, "gpt-6-astra")
+  equal(model_restored.settings.model, "gpt-5.4")
+  equal(model_restored.adapter.schema.model.default, "gpt-5.4")
   print(
     "PASS native model selections persist in the task and chat snapshot rather than reverting to the default"
   )
