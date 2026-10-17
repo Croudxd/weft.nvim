@@ -50,6 +50,9 @@ function M.codex_adapter()
   end
   local adapters = require("codecompanion.adapters")
   local definition = vim.deepcopy(M.adapter)
+  for _, name in ipairs(require("weft.models").names()) do
+    definition.schema.model.choices[name] = definition.schema.model.choices[name] or {}
+  end
   definition.type = "http"
   local adapter = adapters.extend(definition, {})
   local config = require("weft").config
@@ -244,6 +247,9 @@ function M.pick_model(task)
   local chat = M.chats[task.id]
   local current = chat and chat.settings.model or task.model or config.model
   local names = M.model_names()
+  if not vim.tbl_contains(names, current) then
+    table.insert(names, current)
+  end
   table.sort(names, function(a, b)
     if a == b then
       return false

@@ -74,6 +74,41 @@ local function run()
   print("PASS real Codex adapter request builders match CodeCompanion's handler contract")
   equal(vim.fn.getcompletion("Weft model gpt-5.3", "cmdline"), { "gpt-5.3-codex" })
   equal(vim.fn.getcompletion("Weft model def", "cmdline"), { "default" })
+  equal(vim.fn.getcompletion("Weft model gpt-6-as", "cmdline"), { "gpt-6-astra" })
+  local models = require("weft.models")
+  equal(
+    models.parse({
+      models = {
+        { slug = "gpt-6-astra", visibility = "list" },
+        { slug = "internal", visibility = "hide" },
+        { slug = "gpt-6-astra", visibility = "list" },
+      },
+    }),
+    { "gpt-6-astra" }
+  )
+  local system = vim.system
+  local refreshed = false
+  vim.system = function(_, _, callback)
+    callback({
+      code = 0,
+      stdout = vim.json.encode({ models = {
+        { slug = "future-model", visibility = "list" },
+      } }),
+    })
+  end
+  models.refresh(function()
+    refreshed = true
+  end)
+  assert(vim.wait(1000, function()
+    return refreshed
+  end))
+  equal(models.names(), { "future-model" })
+  equal(vim.fn.getcompletion("Weft model future-", "cmdline"), { "future-model" })
+  models.catalogue = nil
+  equal(models.names(), { "future-model" })
+  vim.fn.delete(require("weft").config.state_dir .. "/models.json")
+  models.catalogue = nil
+  vim.system = system
   equal(vim.fn.getcompletion("Weft mo", "cmdline"), { "model" })
   print("PASS model command completion returns adapter models filtered by the typed prefix")
 

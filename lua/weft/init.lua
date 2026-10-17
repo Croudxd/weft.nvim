@@ -290,6 +290,12 @@ local function command(args)
     model = function()
       M.config.load_chat()
       local model = args.fargs[2]
+      if model == "refresh" then
+        local task = current()
+        return require("weft.models").refresh(function()
+          require("weft.agent").pick_model(task)
+        end)
+      end
       if not model then
         return require("weft.agent").pick_model(current())
       end
@@ -343,6 +349,7 @@ function M.complete(lead, line, cursor)
     M.config.load_chat()
     choices = require("weft.agent").model_names()
     table.insert(choices, "default")
+    table.insert(choices, "refresh")
   elseif before:match("^%s*:?Weft%s+[^%s]*$") then
     choices = {
       "open",
