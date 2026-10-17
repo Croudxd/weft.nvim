@@ -120,6 +120,15 @@ local function run()
   http.new = function()
     return {
       send = function(_, payload, callbacks)
+        local request_tools = adapters.call_handler(adapter, "build_tools", { tools = payload.tools })
+        assert(request_tools and request_tools.tools, "Request has no workspace tools")
+        local workspace_tool = false
+        for _, schema in ipairs(request_tools.tools) do
+          if schema.name == "weft_workspace" then
+            workspace_tool = true
+          end
+        end
+        assert(workspace_tool, "Workspace tool missing from outgoing request")
         local id = vim.b[callbacks.bufnr].weft_task
         local task = tasks[id]
         assert(task, "Request not associated with a task")
@@ -163,6 +172,7 @@ local function run()
     }
   end
 
+  local reading_window
   for _, name in ipairs({ "alpha", "beta" }) do
     require("weft.workspace").switch(tasks[name])
     require("weft").open(tasks[name])
@@ -189,7 +199,17 @@ local function run()
         { "Change the return value to my task name." }
       )
     end
+    vim.api.nvim_win_set_cursor(chat.ui.winnr, { 1, 0 })
+    chat.ui.cursor.moved_by_user = true
     agent.send(tasks[name])
+    equal(vim.api.nvim_win_get_cursor(chat.ui.winnr)[1], vim.api.nvim_buf_line_count(chat.bufnr))
+    if name == "beta" then
+      require("weft.ui").source(
+        tasks.beta,
+        require("weft.buffers").load(tasks.beta, tasks.beta.root .. "/app/source.lua")
+      )
+      reading_window = vim.api.nvim_get_current_win()
+    end
   end
   assert(
     vim.wait(10000, function()
@@ -207,6 +227,10 @@ local function run()
     assert(text:find("Updated `app/source.lua`", 1, true), "Tool activity summary is missing")
   end
   equal(util.read(original .. "/source.lua"), "return 1\n")
+  equal(vim.api.nvim_get_current_win(), reading_window)
+  local beta = agent.get(tasks.beta)
+  equal(vim.api.nvim_win_get_cursor(beta.ui.winnr)[1], vim.api.nvim_buf_line_count(beta.bufnr))
+  print("PASS sending resumes scrolling and streamed responses follow without taking focus from source")
   print(
     "PASS two concurrent real CodeCompanion chats apply tool edits to their bound tasks after switching tabs"
   )
@@ -275,6 +299,8 @@ local function run()
   -- Simulate an older persisted UI with raw tool JSON and an unsent draft.
   local legacy = util.load_json(require("weft.store").task_directory(tasks.alpha) .. "/chat.json")
   legacy.display_version, legacy.builder_state = nil, nil
+  legacy.context_items =
+    { { source = "tool", id = "<tool>weft_workspace</tool>", opts = { visible = true } } }
   table.insert(legacy.lines, legacy.header_line, '{"hash":"internal-version","content":"raw tool data"}')
   legacy.header_line = legacy.header_line + 1
   legacy.lines[#legacy.lines] = "Keep my unsent draft."
@@ -316,6 +342,7 @@ local function run()
     vim.split(followup, "\n", { plain = true })
   )
   restored.header_line = last + 100 -- stale saved/parser position must not lose the draft
+  restored.tool_registry.schemas = {} -- recover tools lost by an earlier broken session
   restored:submit()
   assert(vim.wait(10000, function()
     return agent.status.alpha == "ready"
@@ -327,6 +354,8 @@ local function run()
     end
   end
   assert(found_followup, "Restored chat failed to send the complete draft")
+  assert(restored.tool_registry.in_use.weft_workspace, "Restored workspace tool was lost")
+  print("PASS hidden legacy context and missing schemas retain workspace tools on outgoing requests")
   local sent = requests.alpha
   restored:submit()
   equal(requests.alpha, sent) -- blank sends must not repeat an earlier message
@@ -334,15 +363,12 @@ local function run()
 
   local ui, changes = require("weft.ui"), require("weft.changes")
   local yaml_path = tasks.alpha.root .. "/app/settings.yaml"
-  require("weft.files").write(
-    tasks.alpha,
-    {
-      action = "write",
-      path = "app/settings.yaml",
-      expected_hash = vim.fn.sha256(util.read(yaml_path)),
-      content = "service:\n  enabled: true\n",
-    }
-  )
+  require("weft.files").write(tasks.alpha, {
+    action = "write",
+    path = "app/settings.yaml",
+    expected_hash = vim.fn.sha256(util.read(yaml_path)),
+    content = "service:\n  enabled: true\n",
+  })
   changes.refresh_file(tasks.alpha, changes.state(tasks.alpha).entries[yaml_path])
   ui.refresh_changes(tasks.alpha)
   local panel = ui.views[tasks.alpha.id].changes

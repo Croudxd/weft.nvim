@@ -88,6 +88,15 @@ the agent. Markdown code blocks use Tree-sitter highlighting, including YAML
 (install the `yaml` parser for YAML highlighting). Restoring an older chat cleans
 its display while preserving the conversation and its unsent draft.
 
+Sending a message resumes automatic scrolling to the newest response. Streaming
+continues to scroll the chat when you switch to a source window, without taking
+focus away from your code. Scrolling up to read earlier messages pauses following;
+the next send resumes it.
+
+Workspace tools are attached automatically to every task chat, including restored
+chats. You do not need to enable workspace access or create another task to use
+them; hiding context details does not detach the tools.
+
 The default model is `gpt-5.3-codex`. Use **Space → W → M** (with a space
 leader) or **`:Weft model`** to open the model picker. The current model is
 labelled. You can also type **`:Weft model gpt-`** and press **Tab** to complete

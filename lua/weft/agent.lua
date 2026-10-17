@@ -78,7 +78,7 @@ function M.codecompanion_options()
         show_settings = false,
         show_context = false,
         show_token_count = false,
-        auto_scroll = false,
+        auto_scroll = true,
         intro_message = "Write your message below · Ctrl-S to send · <leader>wk to stop",
         window = {
           layout = "vertical",
@@ -178,6 +178,21 @@ local function clean_saved_display(chat, saved)
   chat.builder.state = { last_role = "user", current_header_line = row }
 end
 
+local function ensure_workspace_tool(chat)
+  local registry = chat.tool_registry
+  local name = "weft_workspace"
+  local id = require("codecompanion.interactions.chat.tool_registry").tool_id(name)
+  if registry.in_use[name] and registry.schemas[id] then
+    return
+  end
+  registry.in_use[name] = nil
+  registry:add_single_tool(name, {
+    config = { path = "weft.tools", description = "Operate in this task's workspace" },
+    visible = false,
+  })
+  assert(registry.schemas[id], "Could not attach Weft workspace tools to this chat")
+end
+
 function M.get(task)
   local chat = M.chats[task.id]
   if chat and vim.api.nvim_buf_is_valid(chat.bufnr) then
@@ -197,6 +212,7 @@ function M.get(task)
     tools = { "weft_workspace" },
     callbacks = {
       on_before_submit = function(current)
+        ensure_workspace_tool(current)
         current:set_system_prompt(prompt(task))
         return true
       end,
@@ -236,6 +252,15 @@ function M.get(task)
       }
     clean_saved_display(chat, saved)
   end
+  -- Hidden context has no buffer markers to reconcile. Upstream otherwise
+  -- interprets their absence as deletion and removes tools from restored chats.
+  local check_context = chat.check_context
+  chat.check_context = function(self)
+    if require("codecompanion.config").display.chat.show_context then
+      return check_context(self)
+    end
+  end
+  ensure_workspace_tool(chat)
   -- CodeCompanion's normal send key and :Weft send must repair the same draft.
   local submit = chat.submit
   chat.submit = function(self, options)
@@ -272,6 +297,9 @@ function M.get(task)
           vim.log.levels.INFO
         )
       end
+    end
+    if not self.current_request then
+      ensure_workspace_tool(self)
     end
     return submit(self, options)
   end
