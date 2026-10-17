@@ -213,9 +213,9 @@ M.bindings = {
   {
     "<leader>ww",
     function()
-      M.open()
+      M.tasks()
     end,
-    "Open full task workspace",
+    "Pick task / open workspace",
   },
   {
     "<leader>wW",

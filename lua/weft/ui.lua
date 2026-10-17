@@ -68,7 +68,7 @@ function M.home(task)
     "",
     "Press Enter to open the full workspace.",
     "",
-    "<leader>ww  Open full workspace",
+    "<leader>ww  Pick task / open workspace",
     "<leader>wW  Weft command centre",
     "<leader>wc  Chat",
     "<leader>wl  Changes",
