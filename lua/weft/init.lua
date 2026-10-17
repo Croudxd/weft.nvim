@@ -97,7 +97,6 @@ function M.tasks(on_selected)
     },
     util.guard(function(task)
       if task then
-        workspace.switch(task)
         if on_selected then
           on_selected(task)
         else
