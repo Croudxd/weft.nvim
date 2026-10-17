@@ -81,9 +81,12 @@ Authenticate in your browser when prompted. Write an instruction in the chat
 and press **Ctrl-S** or **`<leader>ws`** to send it. Saving a file does not submit
 a prompt. Use **`<leader>wk`** to stop the current task's agent.
 
-The default model is `gpt-5.3-codex`. Use `:Weft model MODEL` to change the
-current task's model; the choice persists for that task. `:Weft model` resets
-it to the configured default. Model access depends on your ChatGPT account.
+The default model is `gpt-5.3-codex`. Use **Space → W → M** (with a space
+leader) or **`:Weft model`** to open the model picker. The current model is
+labelled. You can also type **`:Weft model gpt-`** and press **Tab** to complete
+the name, then Enter to switch. The choice persists for that task;
+`:Weft model default` resets it to the configured default. The list comes from
+the adapter's catalogue, which can include models your account rejects.
 
 Creating a task opens its full workspace automatically and focuses chat. If
 you reach a task home buffer, press **Enter** to open the workspace.
@@ -151,6 +154,7 @@ bindings are grouped under **w**, leaving existing AI plugin bindings alone.
 | Binding | Action |
 | --- | --- |
 | `<leader>ww` | Open full task workspace |
+| `<leader>wm` | Pick task model |
 | `<leader>wa` | Pick task / agent |
 | `<leader>wn` | Create task / agent |
 | `<leader>wc` | Toggle task chat |

@@ -72,6 +72,10 @@ local function run()
     adapters.call_handler(adapter, "build_tools", { tools = { { require("weft.tools").schema } } })
   equal(schema.tools[1].name, "weft_workspace")
   print("PASS real Codex adapter request builders match CodeCompanion's handler contract")
+  equal(vim.fn.getcompletion("Weft model gpt-5.3", "cmdline"), { "gpt-5.3-codex" })
+  equal(vim.fn.getcompletion("Weft model def", "cmdline"), { "default" })
+  equal(vim.fn.getcompletion("Weft mo", "cmdline"), { "model" })
+  print("PASS model command completion returns adapter models filtered by the typed prefix")
 
   local requests = {}
   local http = require("codecompanion.http")
@@ -190,9 +194,23 @@ local function run()
   print("PASS background commands use their chat's task directory rather than the active tab")
 
   require("weft.workspace").switch(tasks.alpha)
-  agent.set_model(tasks.alpha, "gpt-5.4")
+  local select = vim.ui.select
+  local selection
+  vim.ui.select = function(items, options, callback)
+    equal(items[1], "gpt-5.3-codex")
+    assert(options.format_item(items[1]):find("current", 1, true))
+    selection = callback
+  end
+  vim.cmd("Weft model")
+  assert(selection, "Model command did not open a picker")
+  selection(nil)
+  equal(chat.settings.model, "gpt-5.3-codex")
+  agent.pick_model(tasks.alpha)
+  selection("gpt-5.4")
+  vim.ui.select = select
   equal(chat.settings.model, "gpt-5.4")
   equal(agent.get(tasks.beta).settings.model, "gpt-5.3-codex")
+  print("PASS model picker labels the current choice, preserves cancellation, and changes only its task")
   agent.save(tasks.alpha)
   local function conversation(current)
     local result = {}

@@ -225,6 +225,53 @@ function M.set_model(task, model)
   util.notify("Model for " .. task.name .. ": " .. model)
 end
 
+function M.model_names()
+  local adapter = M.codex_adapter()
+  local choices = adapter.schema.model.choices
+  if type(choices) == "function" then
+    choices = choices(adapter)
+  end
+  local names = {}
+  for name in pairs(choices or {}) do
+    table.insert(names, name)
+  end
+  table.sort(names)
+  return names
+end
+
+function M.pick_model(task)
+  local config = require("weft").config
+  local chat = M.chats[task.id]
+  local current = chat and chat.settings.model or task.model or config.model
+  local names = M.model_names()
+  table.sort(names, function(a, b)
+    if a == b then
+      return false
+    end
+    if a == current then
+      return true
+    end
+    if b == current then
+      return false
+    end
+    return a > b
+  end)
+  vim.ui.select(
+    names,
+    {
+      prompt = "Weft · " .. task.name .. " · model",
+      format_item = function(name)
+        return name .. (name == current and "  (current)" or "")
+      end,
+    },
+    util.guard(function(model)
+      if model then
+        M.set_model(task, model)
+      end
+    end)
+  )
+end
+
 function M.attach(task)
   local buffer = vim.api.nvim_get_current_buf()
   assert(

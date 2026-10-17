@@ -111,6 +111,14 @@ end
 
 M.bindings = {
   {
+    "<leader>wm",
+    function()
+      M.config.load_chat()
+      require("weft.agent").pick_model(current())
+    end,
+    "Pick task model",
+  },
+  {
     "<leader>ww",
     function()
       M.open()
@@ -281,7 +289,11 @@ local function command(args)
   local actions = {
     model = function()
       M.config.load_chat()
-      require("weft.agent").set_model(current(), args.fargs[2] or M.config.model)
+      local model = args.fargs[2]
+      if not model then
+        return require("weft.agent").pick_model(current())
+      end
+      require("weft.agent").set_model(current(), model == "default" and M.config.model or model)
     end,
     open = M.open,
     chat = function()
@@ -321,6 +333,41 @@ local function command(args)
     M.config.load_chat()
   end
   return actions[action]()
+end
+
+function M.complete(lead, line, cursor)
+  local before = line:sub(1, cursor)
+  local model = before:match("^%s*:?Weft%s+model%s+(.*)$")
+  local choices
+  if model and not model:find("%s") then
+    M.config.load_chat()
+    choices = require("weft.agent").model_names()
+    table.insert(choices, "default")
+  elseif before:match("^%s*:?Weft%s+[^%s]*$") then
+    choices = {
+      "open",
+      "new",
+      "tasks",
+      "repo",
+      "chat",
+      "changes",
+      "buffers",
+      "before",
+      "refresh",
+      "browse",
+      "send",
+      "stop",
+      "hide",
+      "help",
+      "auth",
+      "model",
+    }
+  else
+    return {}
+  end
+  return vim.tbl_filter(function(choice)
+    return choice:sub(1, #lead) == lead
+  end, choices)
 end
 
 function M.setup(options)
@@ -366,26 +413,7 @@ function M.setup(options)
   end
   vim.api.nvim_create_user_command("Weft", util.guard(command), {
     nargs = "*",
-    complete = function()
-      return {
-        "open",
-        "new",
-        "tasks",
-        "repo",
-        "chat",
-        "changes",
-        "buffers",
-        "before",
-        "refresh",
-        "browse",
-        "send",
-        "stop",
-        "hide",
-        "help",
-        "auth",
-        "model",
-      }
-    end,
+    complete = M.complete,
     desc = "Weft task workspaces and AI coding",
     force = true,
   })
