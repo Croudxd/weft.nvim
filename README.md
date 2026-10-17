@@ -101,12 +101,10 @@ The default model is `gpt-5.3-codex`. Use **Space → W → M** (with a space
 leader) or **`:Weft model`** to open the model picker. The current model is
 labelled. You can also type **`:Weft model gpt-`** and press **Tab** to complete
 the name, then Enter to switch. The choice persists for that task;
-`:Weft model default` resets it to the configured default. The list combines
-the adapter's catalogue with current public Codex models, including Astra
-(`gpt-6-astra`), Sol, and Luna. Use **`:Weft model refresh`** to download the
-latest official Codex catalogue and reopen the picker. The catalogue is cached
-outside your repositories and is available offline. This is a public catalogue,
-not an account-entitlement list; availability depends on your ChatGPT account.
+`:Weft model default` resets it to the configured default. The picker includes
+models supplied by the installed Codex adapter plus names from the official
+Codex catalogue after **`:Weft model refresh`**. Weft does not invent model
+names; availability still depends on your ChatGPT account.
 
 Creating a task opens its full workspace automatically and focuses chat. If
 you reach a task home buffer, press **Enter** to open the workspace.
@@ -130,7 +128,8 @@ tasks. Existing tasks keep their own repository sets.
   (disk conflict), plus their directory and added/removed line counts. The cursor
   starts on the first file and stays on the selected file during refreshes.
 - Every changed text file is loaded as a normal source buffer in the background.
-  Your focus stays where it is.
+  Set `open_changed_files = true` to follow saved agent edits: the centre view
+  focuses the file and jumps directly to the first changed hunk.
 - Press **Enter** on a file or its detail row to open and focus it; use
   **`]a` / `[a`** to move between changed regions across repositories.
 - AI-written lines have the `WeftAI` tint. Lines you edit have the `WeftEdited`

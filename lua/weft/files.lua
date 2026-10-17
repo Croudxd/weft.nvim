@@ -97,8 +97,10 @@ function M.write(task, args)
   changes.record(task, path, before, after)
   require("weft.ui").refresh_changes(task)
   if require("weft").config.open_changed_files and not dirty and not (args.action == "delete") then
+    -- Use the first hunk recorded from this write, not the file's old cursor
+    -- position, so following an agent always lands directly on its edit.
     vim.schedule(function()
-      require("weft.ui").source(task, buffer)
+      require("weft.ui").open_change(task, entry, 1)
     end)
   end
   return {
