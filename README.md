@@ -220,6 +220,7 @@ require("weft").setup({
   model = "gpt-5.3-codex",
   mappings = true,
   open_changed_files = false, -- Set true to focus each agent-written file as it is saved
+  tabline = false, -- Set true for Weft's task-named built-in tabline
   -- picker = function(items, options, callback) ... end, -- Optional picker integration
   -- browser = function(root) ... end, -- Override workspace-root browsing
 })

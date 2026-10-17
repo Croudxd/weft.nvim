@@ -14,11 +14,19 @@ local defaults = {
   model = "gpt-5.3-codex",
   mappings = true,
   open_changed_files = false,
+  tabline = false,
 }
 
-local function current()
-  local task = assert(workspace.current(), "Choose a Weft task first: :Weft tasks")
-  return task
+local function render_tabline()
+  local tabs = vim.api.nvim_list_tabpages()
+  local labels = {}
+  for index, tab in ipairs(tabs) do
+    local ok, task_id = pcall(vim.api.nvim_tabpage_get_var, tab, "weft_task")
+    local task = ok and store.tasks[task_id]
+    local label = task and task.name or "Tab " .. index
+    table.insert(labels, (tab == vim.api.nvim_get_current_tabpage() and "%#TabLineSel#" or "%#TabLine#") .. " " .. index .. " " .. label .. " ")
+  end
+  return table.concat(labels) .. "%#TabLineFill#"
 end
 
 function M.new(name)
@@ -41,6 +49,10 @@ function M.new(name)
     util.notify("Created task " .. task.name .. " · " .. #task.repositories .. " repositories")
     util.guard(M.open)(task)
   end)
+end
+
+function M._tabline()
+  return render_tabline()
 end
 
 function M.select(items, options, callback)
@@ -485,6 +497,10 @@ function M.setup(options)
   M.config.state_dir = util.path(M.config.state_dir)
   M.config.load_chat = M.config.load_chat or function()
     require("codecompanion")
+  end
+  if M.config.tabline then
+    vim.o.showtabline = 2
+    vim.o.tabline = "%!v:lua.require'weft'._tabline()"
   end
   store.setup(M.config)
   local group = vim.api.nvim_create_augroup("Weft", { clear = true })
