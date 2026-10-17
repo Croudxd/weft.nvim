@@ -21,6 +21,11 @@ local function equal(actual, expected)
 end
 
 local function run()
+  local startup = require("weft.agent").codecompanion_options()
+  assert(startup.interactions.chat.opts.context_management.enabled, "Pre-setup context defaults missing")
+  require("codecompanion").setup(startup)
+  assert(require("codecompanion.config").adapters.http.weft_codex, "Adapter missing after dependency-first setup")
+  print("PASS CodeCompanion can initialize before Weft setup, as it does under lazy.nvim")
   util.git(original, { "init", "-b", "main" })
   util.git(original, { "config", "user.name", "Weft Test" })
   util.git(original, { "config", "user.email", "weft@example.invalid" })

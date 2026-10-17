@@ -23,6 +23,10 @@ local defaults = {
   },
 }
 
+-- Lazy configures dependencies (including CodeCompanion) before Weft.setup().
+-- Adapter options must be able to read the defaults during that phase.
+M.config = vim.deepcopy(defaults)
+
 local function render_tabline()
   local tabs = vim.api.nvim_list_tabpages()
   local labels = {}
