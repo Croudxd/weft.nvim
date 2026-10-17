@@ -1,5 +1,6 @@
 local util = require("weft.util")
 local M = { views = {}, last = {} }
+local changes_namespace = vim.api.nvim_create_namespace("weft-changes-panel")
 
 local function views(task)
   M.views[task.id] = M.views[task.id] or {}
@@ -64,10 +65,10 @@ function M.home(task)
     table.insert(lines, "  " .. repository.name .. " · " .. repository.branch)
   end
   vim.list_extend(lines, {
-      "",
-      "Press Enter to open your chat and changes.",
-      "",
-      "<leader>ww  Open full workspace",
+    "",
+    "Press Enter to open your chat and changes.",
+    "",
+    "<leader>ww  Open full workspace",
     "<leader>wc  Chat",
     "<leader>wl  Changes",
     "<leader>wb  Task buffers",
@@ -77,9 +78,14 @@ function M.home(task)
   local buffer = scratch(task, "home", lines)
   vim.api.nvim_win_set_buf(0, buffer)
   views(task).home = { buffer = buffer, window = vim.api.nvim_get_current_win() }
-  vim.keymap.set("n", "<CR>", util.guard(function()
-    require("weft").open(task)
-  end), { buffer = buffer, desc = "Open Weft workspace" })
+  vim.keymap.set(
+    "n",
+    "<CR>",
+    util.guard(function()
+      require("weft").open(task)
+    end),
+    { buffer = buffer, desc = "Open Weft workspace" }
+  )
 end
 
 function M.source(task, buffer)
@@ -122,22 +128,87 @@ function M.refresh_changes(task)
   if not view or not vim.api.nvim_buf_is_valid(view.buffer) then
     return
   end
+  local win = window(task, "changes")
+  local cursor = win and vim.api.nvim_win_get_cursor(win)[1]
+  local selected = cursor and view.rows and view.rows[cursor]
   view.entries = require("weft.changes").list(task)
-  local lines = { "Changes · " .. task.name, "Enter open · o before · s seen · r refresh", "" }
+  view.rows = {}
+  local count = #view.entries
+  local lines = {
+    "  Changes",
+    "  " .. task.name .. " · " .. count .. (count == 1 and " file" or " files"),
+    "",
+    "  Enter open  ·  o before",
+    "  s reviewed  ·  r refresh",
+    "",
+  }
+  local highlights = { { 0, "Title" }, { 1, "Comment" }, { 3, "Comment" }, { 4, "Comment" } }
+  local repository, first_row, selected_row
   for _, entry in ipairs(view.entries) do
-    local status = entry.disk_conflict and "!" or entry.seen_hash == entry.current_hash and "✓" or "●"
-    local kind = entry.deleted and "deleted"
+    local relative = entry.path:sub(#task.root + 2)
+    local repo, path = relative:match("^([^/]+)/(.+)$")
+    repo, path = repo or "Files", path or relative
+    if repo ~= repository then
+      if repository then
+        table.insert(lines, "")
+      end
+      table.insert(lines, "  " .. repo .. "/")
+      table.insert(highlights, { #lines - 1, "Directory" })
+      repository = repo
+    end
+    local status = entry.disk_conflict and "!"
+      or entry.seen_hash == entry.current_hash and "✓"
+      or entry.deleted and "D"
+      or not entry.existed and "A"
+      or "M"
+    local group = entry.disk_conflict and "DiagnosticError"
+      or entry.seen_hash == entry.current_hash and "Comment"
+      or entry.deleted and "DiffDelete"
+      or not entry.existed and "DiffAdd"
+      or "DiffChange"
+    table.insert(lines, "  " .. status .. " " .. vim.fs.basename(path))
+    view.rows[#lines] = entry
+    first_row = first_row or #lines
+    if selected and selected.path == entry.path then
+      selected_row = #lines
+    end
+    table.insert(highlights, { #lines - 1, group, 2, 3 + (status == "✓" and 2 or 0) })
+    local added, removed = 0, 0
+    for _, hunk in ipairs(entry.hunks or {}) do
+      removed, added = removed + hunk[2], added + hunk[4]
+    end
+    local directory = vim.fs.dirname(path)
+    local detail = entry.disk_conflict and "disk conflict"
+      or entry.deleted and "deleted"
       or entry.binary and "binary / large"
-      or not entry.existed and "new"
-      or tostring(#entry.hunks) .. " changes"
-    table.insert(lines, status .. " " .. entry.path:sub(#task.root + 2) .. "  · " .. kind)
+      or ("+" .. added .. " −" .. removed)
+    if directory ~= "." then
+      detail = directory .. "/  ·  " .. detail
+    end
+    table.insert(lines, "    " .. detail)
+    view.rows[#lines] = entry
+    table.insert(highlights, { #lines - 1, "Comment" })
   end
   if #view.entries == 0 then
-    table.insert(lines, "No changes yet")
+    table.insert(lines, "  No changes yet")
   end
   vim.bo[view.buffer].modifiable = true
   vim.api.nvim_buf_set_lines(view.buffer, 0, -1, false, lines)
   vim.bo[view.buffer].modifiable = false
+  vim.api.nvim_buf_clear_namespace(view.buffer, changes_namespace, 0, -1)
+  for _, mark in ipairs(highlights) do
+    vim.api.nvim_buf_set_extmark(view.buffer, changes_namespace, mark[1], mark[3] or 0, {
+      end_col = mark[4] or #lines[mark[1] + 1],
+      hl_group = mark[2],
+    })
+  end
+  if win and first_row then
+    vim.api.nvim_win_set_cursor(
+      win,
+      { selected_row or (not view.positioned and first_row) or math.min(cursor, #lines), 0 }
+    )
+    view.positioned = true
+  end
 end
 
 function M.changes(task, options)
@@ -152,8 +223,21 @@ function M.changes(task, options)
   vim.cmd("topleft " .. width .. "vsplit")
   vim.api.nvim_win_set_buf(0, buffer)
   views(task).changes = { buffer = buffer, window = vim.api.nvim_get_current_win() }
+  for option, value in pairs({
+    number = false,
+    relativenumber = false,
+    wrap = false,
+    cursorline = true,
+    signcolumn = "no",
+    foldcolumn = "0",
+    statuscolumn = "",
+    winfixwidth = true,
+    spell = false,
+  }) do
+    vim.wo[option] = value
+  end
   local function selected()
-    return views(task).changes.entries[vim.api.nvim_win_get_cursor(0)[1] - 3]
+    return views(task).changes.rows[vim.api.nvim_win_get_cursor(0)[1]]
   end
   local function map(key, callback)
     vim.keymap.set(
@@ -165,7 +249,7 @@ function M.changes(task, options)
           callback(entry)
         end
       end),
-      { buffer = buffer }
+      { buffer = buffer, desc = "Weft changes: " .. key, nowait = true }
     )
   end
   map("<CR>", function(entry)
@@ -245,6 +329,7 @@ function M.before(task, entry, index)
   end
   local buffer = scratch(task, "before", lines)
   vim.bo[buffer].filetype = vim.filetype.match({ filename = entry.path }) or ""
+  pcall(vim.treesitter.start, buffer)
   local width = math.max(20, math.min(100, vim.o.columns - 4))
   local height = math.max(1, math.min(#lines, math.floor(vim.o.lines * 0.5)))
   local win = vim.api.nvim_open_win(buffer, true, {

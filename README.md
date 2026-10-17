@@ -77,9 +77,16 @@ Weft's workspace layer can be used without chat dependencies.
 :Weft open
 ```
 
-Authenticate in your browser when prompted. Write an instruction in the chat
-and press **Ctrl-S** or **`<leader>ws`** to send it. Saving a file does not submit
+Authenticate in your browser when prompted. Write an instruction below the last
+**Me** heading in the chat and press **Ctrl-S** or **`<leader>ws`** to send it.
+Saving a file does not submit
 a prompt. Use **`<leader>wk`** to stop the current task's agent.
+
+Chat shows short file/command activity summaries instead of raw tool JSON,
+hashes, attachment bookkeeping, or token counts. Full tool results still reach
+the agent. Markdown code blocks use Tree-sitter highlighting, including YAML
+(install the `yaml` parser for YAML highlighting). Restoring an older chat cleans
+its display while preserving the conversation and its unsent draft.
 
 The default model is `gpt-5.3-codex`. Use **Space → W → M** (with a space
 leader) or **`:Weft model`** to open the model picker. The current model is
@@ -107,10 +114,13 @@ tasks. Existing tasks keep their own repository sets.
 ## Inspecting changes
 
 - **`<leader>wl`** opens a task-wide changed-file list, labelled by repository.
+  Files show `A` (added), `M` (modified), `D` (deleted), `✓` (reviewed), or `!`
+  (disk conflict), plus their directory and added/removed line counts. The cursor
+  starts on the first file and stays on the selected file during refreshes.
 - Every changed text file is loaded as a normal source buffer in the background.
   Your focus stays where it is.
-- Press **Enter** on a file to open it; use **`]a` / `[a`** to move between
-  changed regions across repositories.
+- Press **Enter** on a file or its detail row to open and focus it; use
+  **`]a` / `[a`** to move between changed regions across repositories.
 - AI-written lines have the `WeftAI` tint. Lines you edit have the `WeftEdited`
   tint; unchanged AI lines keep their ownership as surrounding lines move.
 - **`<leader>wo`** opens the code from before the task, with surrounding context.

@@ -1,4 +1,5 @@
 vim.opt.runtimepath:prepend(vim.fn.getcwd())
+vim.opt.runtimepath:append(vim.fn.getcwd() .. "/after")
 vim.opt.hidden = true
 vim.o.swapfile = false
 local dependencies = vim.env.WEFT_DEPENDENCIES or vim.fn.stdpath("data") .. "/lazy"
@@ -24,6 +25,7 @@ local function run()
   util.git(original, { "config", "user.name", "Weft Test" })
   util.git(original, { "config", "user.email", "weft@example.invalid" })
   util.write(original .. "/source.lua", "return 1\n")
+  util.write(original .. "/settings.yaml", "service:\n  enabled: false\n")
   util.git(original, { "add", "." })
   util.git(original, { "commit", "-m", "Initial" })
   require("weft").setup({
@@ -171,13 +173,22 @@ local function run()
     local chat = agent.get(tasks[name])
     equal(chat.settings.model, "gpt-5.3-codex")
     local last = vim.api.nvim_buf_line_count(chat.bufnr)
-    vim.api.nvim_buf_set_lines(
-      chat.bufnr,
-      last - 1,
-      last,
-      false,
-      { "Change the return value to my task name." }
-    )
+    if name == "alpha" then
+      -- Paste over the initial heading, as in an ordinary editable buffer.
+      vim.api.nvim_buf_set_lines(chat.bufnr, 0, -1, false, {
+        "Change the return value to my task name.",
+        "",
+        "Keep the surrounding code intact.",
+      })
+    else
+      vim.api.nvim_buf_set_lines(
+        chat.bufnr,
+        last - 1,
+        last,
+        false,
+        { "Change the return value to my task name." }
+      )
+    end
     agent.send(tasks[name])
   end
   assert(
@@ -190,6 +201,10 @@ local function run()
     equal(util.read(tasks[name].root .. "/app/source.lua"), "return '" .. name .. "'\n")
     assert(requests[name] >= 2, "Agent did not continue after its tool call")
     equal(#require("weft.changes").list(tasks[name]), 1)
+    local text = table.concat(vim.api.nvim_buf_get_lines(agent.get(tasks[name]).bufnr, 0, -1, false), "\n")
+    assert(not text:find('"hash"', 1, true), "Tool hashes leaked into chat display")
+    assert(not text:find('"path":', 1, true), "Raw tool JSON leaked into chat display")
+    assert(text:find("Updated `app/source.lua`", 1, true), "Tool activity summary is missing")
   end
   equal(util.read(original .. "/source.lua"), "return 1\n")
   print(
@@ -257,12 +272,22 @@ local function run()
     return result
   end
   local original_messages = conversation(chat)
+  -- Simulate an older persisted UI with raw tool JSON and an unsent draft.
+  local legacy = util.load_json(require("weft.store").task_directory(tasks.alpha) .. "/chat.json")
+  legacy.display_version, legacy.builder_state = nil, nil
+  table.insert(legacy.lines, legacy.header_line, '{"hash":"internal-version","content":"raw tool data"}')
+  legacy.header_line = legacy.header_line + 1
+  legacy.lines[#legacy.lines] = "Keep my unsent draft."
+  util.save_json(require("weft.store").task_directory(tasks.alpha) .. "/chat.json", legacy)
   chat:close()
   agent.chats.alpha = nil
   local restored = agent.get(tasks.alpha)
   equal(restored.settings.model, "gpt-5.4")
   equal(conversation(restored), original_messages)
   equal(vim.b[restored.bufnr].weft_task, "alpha")
+  local restored_text = table.concat(vim.api.nvim_buf_get_lines(restored.bufnr, 0, -1, false), "\n")
+  assert(not restored_text:find('"hash"', 1, true), "Legacy tool JSON was not removed from the display")
+  assert(restored_text:find("Keep my unsent draft.", 1, true), "Legacy cleanup lost an unsent draft")
   require("weft.ui").source(tasks.alpha, vim.fn.bufnr(tasks.alpha.root .. "/app/source.lua"))
   agent.attach(tasks.alpha)
   vim.cmd("Weft before")
@@ -279,6 +304,73 @@ local function run()
   )
   print("PASS previous-code command opens and toggles the source file preview")
   print("PASS task chats persist outside repositories and restore with buffer attachments")
+
+  -- Native Ctrl-S invokes chat:submit directly, so test that route after restore.
+  local followup = "Please explain the change.\n\nInclude a YAML example."
+  local last = vim.api.nvim_buf_line_count(restored.bufnr)
+  vim.api.nvim_buf_set_lines(
+    restored.bufnr,
+    last - 1,
+    last,
+    false,
+    vim.split(followup, "\n", { plain = true })
+  )
+  restored.header_line = last + 100 -- stale saved/parser position must not lose the draft
+  restored:submit()
+  assert(vim.wait(10000, function()
+    return agent.status.alpha == "ready"
+  end, 10))
+  local found_followup = false
+  for _, message in ipairs(restored.messages) do
+    if message.role == "user" and message.content:gsub("%s+", " ") == followup:gsub("%s+", " ") then
+      found_followup = true
+    end
+  end
+  assert(found_followup, "Restored chat failed to send the complete draft")
+  local sent = requests.alpha
+  restored:submit()
+  equal(requests.alpha, sent) -- blank sends must not repeat an earlier message
+  print("PASS pasted prompts and restored multiline drafts send without repeating empty messages")
+
+  local ui, changes = require("weft.ui"), require("weft.changes")
+  local yaml_path = tasks.alpha.root .. "/app/settings.yaml"
+  require("weft.files").write(
+    tasks.alpha,
+    {
+      action = "write",
+      path = "app/settings.yaml",
+      expected_hash = vim.fn.sha256(util.read(yaml_path)),
+      content = "service:\n  enabled: true\n",
+    }
+  )
+  changes.refresh_file(tasks.alpha, changes.state(tasks.alpha).entries[yaml_path])
+  ui.refresh_changes(tasks.alpha)
+  local panel = ui.views[tasks.alpha.id].changes
+  local row
+  for line, entry in pairs(panel.rows) do
+    if entry.path == yaml_path and (not row or line < row) then
+      row = line
+    end
+  end
+  assert(row, "YAML file missing from changes panel")
+  vim.api.nvim_set_current_win(panel.window)
+  vim.api.nvim_win_set_cursor(panel.window, { row, 0 })
+  ui.refresh_changes(tasks.alpha)
+  equal(panel.rows[vim.api.nvim_win_get_cursor(panel.window)[1]].path, yaml_path)
+  vim.fn.maparg("<CR>", "n", false, true).callback()
+  equal(vim.api.nvim_buf_get_name(0), yaml_path)
+  assert(vim.api.nvim_get_current_win() ~= panel.window, "Enter did not focus the source window")
+  ui.before(tasks.alpha)
+  equal(vim.bo[ui.views[tasks.alpha.id].before.buffer].filetype, "yaml")
+  equal(
+    vim.api.nvim_buf_get_lines(ui.views[tasks.alpha.id].before.buffer, 0, -1, false),
+    { "service:", "  enabled: false" }
+  )
+  ui.hide(tasks.alpha, "before")
+  local yaml = vim.treesitter.get_string_parser("```yaml/\nservice:\n  enabled: true\n```\n", "markdown")
+  yaml:parse(true)
+  assert(yaml:children().yaml, "Trailing-slash YAML fence was not highlighted as YAML")
+  print("PASS changes selection survives refresh, Enter opens the file, and YAML previews resolve correctly")
   http.new = real_new
 end
 

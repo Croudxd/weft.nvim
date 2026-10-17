@@ -102,13 +102,19 @@ M.schema = {
 }
 M.output = {
   success = function(self, stdout, meta)
-    meta.tools.chat:add_tool_output(
-      self,
-      {
-        content = tostring(stdout[#stdout]),
-        display = self.args.action .. " · " .. self.args.path .. "\n" .. tostring(stdout[#stdout]),
-      }
-    )
+    local labels = {
+      read = "Read",
+      list = "Listed",
+      search = "Searched",
+      write = "Updated",
+      replace = "Updated",
+      delete = "Deleted",
+      command = "Ran command in",
+    }
+    meta.tools.chat:add_tool_output(self, {
+      content = tostring(stdout[#stdout]),
+      display = (labels[self.args.action] or self.args.action) .. " `" .. self.args.path .. "`",
+    })
   end,
   error = function(self, stderr, meta)
     meta.tools.chat:add_tool_output(self, { content = tostring(stderr[#stderr]) })

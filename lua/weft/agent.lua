@@ -76,8 +76,25 @@ function M.codecompanion_options()
     display = {
       chat = {
         show_settings = false,
+        show_context = false,
+        show_token_count = false,
         auto_scroll = false,
-        window = { layout = "vertical", width = 0.35, pertab = true },
+        intro_message = "Write your message below · Ctrl-S to send · <leader>wk to stop",
+        window = {
+          layout = "vertical",
+          width = 0.35,
+          pertab = true,
+          opts = {
+            number = false,
+            relativenumber = false,
+            signcolumn = "no",
+            foldcolumn = "0",
+            wrap = true,
+            linebreak = true,
+            breakindent = true,
+            conceallevel = 2,
+          },
+        },
       },
     },
   }
@@ -94,6 +111,8 @@ function M.save(task)
     header_line = chat.header_line,
     last_role = chat._last_role,
     cycle = chat.cycle,
+    builder_state = chat.builder.state,
+    display_version = 2,
     context_items = chat.context_items,
   })
 end
@@ -113,6 +132,50 @@ local function prompt(task)
     "Make changes directly with tools. Keep progress and final responses concise. Do not just output code suggestions.",
     "Do not commit, merge, switch branches, or remove worktrees unless explicitly requested.",
   }, "\n")
+end
+
+local function clean_saved_display(chat, saved)
+  if saved.display_version == 2 then
+    return
+  end
+  local lines = saved.lines or {}
+  local header = saved.header_line or 1
+  local draft
+  if lines[header] and lines[header]:match("^## ") and saved.last_role == "user" then
+    draft = vim.list_slice(lines, header + 1)
+  elseif #saved.messages <= 2 then
+    -- A fresh chat whose heading was overwritten by a paste.
+    draft = vim.deepcopy(lines)
+  else
+    return -- Preserve edited transcripts if the draft cannot be identified safely.
+  end
+  local first = 1
+  while draft[first] == "" do
+    first = first + 1
+  end
+  if draft[first] == "> Context:" then
+    while draft[first] and draft[first]:sub(1, 1) == ">" do
+      table.remove(draft, first)
+    end
+  end
+  local display = {}
+  for _, message in ipairs(saved.messages) do
+    if
+      (message.role == "user" or message.role == "llm")
+      and not (message.opts and message.opts.visible == false)
+      and message.content
+      and vim.trim(message.content) ~= ""
+    then
+      table.insert(display, vim.deepcopy(message))
+    end
+  end
+  table.insert(display, { role = "user", content = table.concat(draft, "\n") })
+  -- Render a display-only copy: full tool results remain in chat.messages.
+  chat.ui:render(nil, display, { stop_context_insertion = true })
+  local row = require("codecompanion.interactions.chat.parser").headers(chat) or 0
+  chat.header_line = row + 1
+  chat._last_role = "user"
+  chat.builder.state = { last_role = "user", current_header_line = row }
 end
 
 function M.get(task)
@@ -166,7 +229,54 @@ function M.get(task)
     chat.header_line = saved.header_line
     chat._last_role = saved.last_role
     chat.cycle = saved.cycle
+    chat.builder.state = saved.builder_state
+      or {
+        last_role = saved.last_role,
+        current_header_line = math.max(0, (saved.header_line or 1) - 1),
+      }
+    clean_saved_display(chat, saved)
   end
+  -- CodeCompanion's normal send key and :Weft send must repair the same draft.
+  local submit = chat.submit
+  chat.submit = function(self, options)
+    if not self.current_request and not (options and (options.auto_submit or options.regenerate)) then
+      local parser = require("codecompanion.interactions.chat.parser")
+      local header = parser.headers(self)
+      if header == nil then
+        local has_history = false
+        for _, message in ipairs(self.messages) do
+          if message.role ~= "system" and not (message.opts and message.opts.visible == false) then
+            has_history = true
+            break
+          end
+        end
+        if has_history then
+          return util.notify(
+            "Chat input heading is missing. Undo the heading edit before sending; your text is still here.",
+            vim.log.levels.WARN
+          )
+        end
+        -- A fresh chat may have been replaced with a pasted, headerless prompt.
+        local lines = {}
+        self.ui:set_header(lines, require("codecompanion.config").interactions.chat.roles.user)
+        vim.api.nvim_buf_set_lines(self.bufnr, 0, 0, false, lines)
+        header = 0
+      end
+      self.header_line = header + 1
+      self.builder.state.last_role = "user"
+      self.builder.state.current_header_line = header
+      local message = parser.messages(self, self.header_line)
+      if not message or vim.trim(message.content or "") == "" then
+        return util.notify(
+          "Write your message below the last Me heading, then press Ctrl-S. Your text has not been sent.",
+          vim.log.levels.INFO
+        )
+      end
+    end
+    return submit(self, options)
+  end
+  vim.treesitter.language.register("markdown", "codecompanion")
+  pcall(vim.treesitter.start, chat.bufnr, "markdown")
   chat:set_system_prompt(prompt(task))
   vim.keymap.set("n", "q", function()
     M.toggle(task)
@@ -199,14 +309,16 @@ end
 
 function M.send(task)
   local chat = M.get(task)
-  local found = false
+  local found
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
     if vim.api.nvim_win_get_buf(win) == chat.bufnr then
-      found = true
+      found = win
     end
   end
   if not found then
     M.toggle(task)
+  else
+    vim.api.nvim_set_current_win(found)
   end
   chat:submit()
 end
