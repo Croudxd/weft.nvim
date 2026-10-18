@@ -40,12 +40,13 @@ checkout. Creating and switching tasks never commits or stashes your work.
 - Neovim 0.12+
 - Git, curl, OpenSSL, ripgrep, and bash
 - Tree-sitter `markdown` and `markdown_inline` parsers
-- A ChatGPT subscription supported by the community Codex OAuth adapter
-- CodeCompanion and the OAuth adapter, pinned in the installation example
+- CodeCompanion and an adapter configured according to its documentation
 
-Weft uses CodeCompanion for chat and the agent loop, and
-[cc-adapter-codex.nvim](https://github.com/viespejo/cc-adapter-codex.nvim) for
-subscription authentication. No Codex CLI or OpenCode process is needed.
+Weft uses CodeCompanion for chat and the agent loop. Its install example includes
+[cc-adapter-codex.nvim](https://github.com/viespejo/cc-adapter-codex.nvim) as a
+convenient ChatGPT/Codex default, but Weft can use any CodeCompanion adapter you
+configure. Authentication, API keys, and local-provider setup are owned by
+CodeCompanion and its adapters; Weft has no separate authentication flow.
 
 ## Install with lazy.nvim
 
@@ -63,6 +64,8 @@ arguments to the pinned CodeCompanion version.
 
 If you already configure CodeCompanion, merge
 `require("weft.agent").codecompanion_options()` into that configuration once.
+Configure additional providers through CodeCompanion as usual; `<leader>wm` or
+`:Weft model` then lets each task select an available provider and its model.
 Weft's workspace layer can be used without chat dependencies.
 
 ## First task
@@ -72,7 +75,6 @@ Weft's workspace layer can be used without chat dependencies.
 :Weft repo add ~/dev/app
 :Weft repo add ~/dev/service
 :Weft repo add ~/dev/infrastructure
-:Weft auth
 :Weft new fix-timeouts
 :Weft open
 ```
@@ -97,14 +99,11 @@ Workspace tools are attached automatically to every task chat, including restore
 chats. You do not need to enable workspace access or create another task to use
 them; hiding context details does not detach the tools.
 
-The default model is `gpt-5.3-codex`. Use **Space → W → M** (with a space
-leader) or **`:Weft model`** to open the model picker. The current model is
-labelled. You can also type **`:Weft model gpt-`** and press **Tab** to complete
-the name, then Enter to switch. The choice persists for that task;
-`:Weft model default` resets it to the configured default. The picker includes
-models supplied by the installed Codex adapter plus names from the official
-Codex catalogue after **`:Weft model refresh`**. Weft does not invent model
-names; availability still depends on your ChatGPT account.
+The default model is `gpt-5.3-codex` on the default `weft_codex` adapter. Use
+**Space → W → M** (with a space leader) or **`:Weft model`** to choose a
+CodeCompanion provider and then one of the models it exposes. The provider and
+model persist per task. `:Weft model default` resets the model to the configured
+default. Authentication and available models remain entirely provider-owned.
 
 Creating a task opens its full workspace automatically and focuses chat. If
 you reach a task home buffer, press **Enter** to open the workspace.
@@ -216,6 +215,7 @@ require("weft").setup({
   poll_interval = 2000, -- Milliseconds; 0 disables background reconciliation
   max_file_bytes = 1024 * 1024,
   command_timeout = 120000,
+  adapter = "weft_codex", -- Any configured CodeCompanion adapter
   model = "gpt-5.3-codex",
   mappings = true,
   open_changed_files = false, -- Set true to focus each agent-written file as it is saved

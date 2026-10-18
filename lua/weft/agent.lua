@@ -51,11 +51,6 @@ function M.codex_adapter()
   local adapters = require("codecompanion.adapters")
   local definition = vim.deepcopy(M.adapter)
   definition.type = "http"
-  -- Only add model names obtained from the upstream Codex catalogue (or its
-  -- persisted cache); Weft never invents model identifiers.
-  for _, name in ipairs(require("weft.models").names()) do
-    definition.schema.model.choices[name] = definition.schema.model.choices[name] or {}
-  end
   local adapter = adapters.extend(definition, {})
   -- The upstream OAuth adapter has no context-window metadata. Supplying the
   -- documented Codex window lets CodeCompanion compact before prompts grow slow
@@ -132,11 +127,13 @@ function M.save(task)
   end
   M.repair_display(chat)
   local model = chat.settings.model
-  if model and task.model ~= model then
-    task.model = model
+  local adapter = chat.adapter.name
+  if model and (task.model ~= model or task.adapter ~= adapter) then
+    task.model, task.adapter = model, adapter
     store.save()
   end
   util.save_json(store.task_directory(task) .. "/chat.json", {
+    adapter = adapter,
     model = model,
     messages = chat.messages,
     lines = vim.api.nvim_buf_get_lines(chat.bufnr, 0, -1, false),
@@ -244,9 +241,10 @@ function M.get(task)
   end
   require("codecompanion")
   local saved = util.load_json(store.task_directory(task) .. "/chat.json", nil)
+  local config = require("weft").config
   chat = require("codecompanion.interactions.chat").new({
-    adapter = require("codecompanion.adapters").resolve("weft_codex", {
-      model = (saved and saved.model) or task.model or require("weft").config.model,
+    adapter = require("codecompanion.adapters").resolve((saved and saved.adapter) or task.adapter or config.adapter, {
+      model = (saved and saved.model) or task.model or config.model,
     }),
     title = "Weft · " .. task.name,
     hidden = true,
@@ -406,62 +404,72 @@ function M.set_model(task, model)
   local chat = M.get(task)
   assert(not chat.current_request, "Stop the current request before switching models")
   chat:change_model({ model = model })
-  task.model = model
+  task.model, task.adapter = model, chat.adapter.name
   store.save()
   M.save(task)
-  util.notify("Model for " .. task.name .. ": " .. model)
+  util.notify("Model for " .. task.name .. ": " .. chat.adapter.name .. " / " .. model)
+end
+
+function M.set_adapter(task, name)
+  local chat = M.get(task)
+  assert(not chat.current_request, "Stop the current request before switching adapters")
+  local changed = chat:change_adapter({ adapter = name })
+  if not changed then
+    return false
+  end
+  chat:set_system_prompt(prompt(task))
+  task.adapter = chat.adapter.name
+  task.model = chat.settings.model
+  store.save()
+  M.save(task)
+  return true
+end
+
+function M.adapters(current)
+  return require("codecompanion.adapters.ui").get_adapters_list(current)
 end
 
 function M.model_names()
   local adapter = M.codex_adapter()
-  local names, seen = {}, {}
-  for name in pairs(adapter.schema.model.choices or {}) do
-    seen[name] = true
-    table.insert(names, name)
-  end
-  for _, name in ipairs(require("weft.models").names()) do
-    if not seen[name] then
-      table.insert(names, name)
-    end
-  end
+  local names = vim.tbl_keys(adapter.schema.model.choices or {})
   table.sort(names)
   return names
 end
 
 function M.pick_model(task)
-  local config = require("weft").config
-  local chat = M.chats[task.id]
-  local current = chat and chat.settings.model or task.model or config.model
-  local names = M.model_names()
-  if not vim.tbl_contains(names, current) then
-    table.insert(names, current)
-  end
-  table.sort(names, function(a, b)
-    if a == b then
-      return false
+  local chat = M.get(task)
+  local current_adapter = chat.adapter.name
+  local current_model = chat.settings.model
+  require("weft").select(M.adapters(current_adapter), {
+    prompt = "Weft · " .. task.name .. " · provider",
+    format_item = function(name)
+      return name .. (name == current_adapter and "  (current)" or "")
+    end,
+  }, util.guard(function(adapter)
+    if not adapter then
+      return
     end
-    if a == current then
-      return true
+    if adapter ~= current_adapter and not M.set_adapter(task, adapter) then
+      return
     end
-    if b == current then
-      return false
+    chat = M.get(task)
+    local choices = require("codecompanion.adapters.ui").list_http_models(chat.adapter)
+    if not choices then
+      return util.notify("No selectable models exposed by " .. chat.adapter.name)
     end
-    return a > b
-  end)
-  require("weft").select(
-    names,
-    {
-      prompt = "Weft · " .. task.name .. " · model",
-      format_item = function(name)
-        return name .. (name == current and "  (current)" or "")
+    require("weft").select(choices, {
+      prompt = "Weft · " .. task.name .. " · " .. chat.adapter.name .. " · model",
+      format_item = function(choice)
+        local name = type(choice) == "table" and (choice.id or choice.modelId) or choice
+        local label = type(choice) == "table" and (choice.formatted_name or choice.description or name) or name
+        return label .. (name == current_model and "  (current)" or "")
       end,
-    },
-    util.guard(function(model)
-      if model then
-        M.set_model(task, model)
+    }, util.guard(function(choice)
+      if choice then
+        M.set_model(task, type(choice) == "table" and (choice.id or choice.modelId) or choice)
       end
-    end)
-  )
+    end))
+  end))
 end
 
 function M.attach(task)

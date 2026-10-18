@@ -11,6 +11,7 @@ local defaults = {
   poll_interval = 2000,
   max_file_bytes = 1024 * 1024,
   command_timeout = 120000,
+  adapter = "weft_codex",
   model = "gpt-5.3-codex",
   mappings = true,
   open_changed_files = false,
@@ -415,12 +416,6 @@ local function command(args)
     model = function()
       M.config.load_chat()
       local model = args.fargs[2]
-      if model == "refresh" then
-        local task = current()
-        return require("weft.models").refresh(function()
-          require("weft.agent").pick_model(task)
-        end)
-      end
       if not model then
         return require("weft.agent").pick_model(current())
       end
@@ -453,11 +448,6 @@ local function command(args)
     help = function()
       require("weft.ui").help(workspace.current() or { id = "global", name = "Weft" })
     end,
-    auth = function()
-      M.config.load_chat()
-      require("weft.agent").codex_adapter()
-      vim.cmd("CodeCompanionCodexAuth")
-    end,
   }
   assert(actions[action], "Unknown Weft action: " .. action)
   if action == "chat" or action == "send" then
@@ -471,10 +461,7 @@ function M.complete(lead, line, cursor)
   local model = before:match("^%s*:?Weft%s+model%s+(.*)$")
   local choices
   if model and not model:find("%s") then
-    M.config.load_chat()
-    choices = require("weft.agent").model_names()
-    table.insert(choices, "default")
-    table.insert(choices, "refresh")
+    choices = { "default" }
   elseif before:match("^%s*:?Weft%s+[^%s]*$") then
     choices = {
       "open",
@@ -491,7 +478,6 @@ function M.complete(lead, line, cursor)
       "stop",
       "hide",
       "help",
-      "auth",
       "model",
     }
   else
