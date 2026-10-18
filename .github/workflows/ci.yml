@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: nightly
+      - name: Install chat test dependencies
+        run: |
+          mkdir -p "$HOME/.local/share/nvim/lazy"
+          git clone --depth 1 https://github.com/nvim-lua/plenary.nvim "$HOME/.local/share/nvim/lazy/plenary.nvim"
+          git clone --depth 1 https://github.com/olimorris/codecompanion.nvim "$HOME/.local/share/nvim/lazy/codecompanion.nvim"
+          git clone --depth 1 https://github.com/viespejo/cc-adapter-codex.nvim "$HOME/.local/share/nvim/lazy/cc-adapter-codex.nvim"
+      - name: Run tests
+        run: |
+          make test
+          make test-chat
