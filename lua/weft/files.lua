@@ -60,12 +60,14 @@ function M.write(task, args)
   local entry = changes.capture(task, path, before)
   assert(not entry.disk_conflict, "Disk and unsaved buffer have diverged; resolve the external edit first")
   local after = args.content
+  local changed_line = 1
   if args.action == "replace" then
     assert(type(args.old_text) == "string" and args.old_text ~= "", "old_text must not be empty")
     assert(before, "Cannot replace text in a missing file")
     local first, last = before:find(args.old_text, 1, true)
     assert(first and not before:find(args.old_text, last + 1, true), "old_text must match exactly once")
     assert(type(after) == "string", "content must contain the replacement text")
+    changed_line = select(2, before:sub(1, first - 1):gsub("\n", "")) + 1
     after = before:sub(1, first - 1) .. after .. before:sub(last + 1)
   end
   if args.action == "delete" then
@@ -100,7 +102,7 @@ function M.write(task, args)
     -- Use the first hunk recorded from this write, not the file's old cursor
     -- position, so following an agent always lands directly on its edit.
     vim.schedule(function()
-      require("weft.ui").open_change(task, entry, 1)
+      require("weft.ui").reveal(task, path, changed_line)
     end)
   end
   return {

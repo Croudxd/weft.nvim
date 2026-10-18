@@ -109,18 +109,25 @@ function M.source(task, buffer)
   vim.wo[destination].signcolumn = "yes:1"
 end
 
+function M.reveal(task, path, line)
+  local buffer = require("weft.buffers").load(task, path)
+  M.source(task, buffer)
+  local win = vim.api.nvim_get_current_win()
+  line = math.min(math.max(1, line or 1), vim.api.nvim_buf_line_count(buffer))
+  vim.api.nvim_win_set_cursor(win, { line, 0 })
+  vim.api.nvim_win_call(win, function()
+    vim.cmd("normal! zz")
+  end)
+end
+
 function M.open_change(task, entry, index)
   index = index or 1
   M.last[task.id] = { entry = entry, index = index }
   if entry.deleted or entry.binary then
     return M.before(task, entry, index)
   end
-  M.source(task, require("weft.buffers").load(task, entry.path))
   local hunk = entry.hunks and entry.hunks[index]
-  local line = hunk and math.max(1, hunk[3]) or 1
-  line = math.min(line, vim.api.nvim_buf_line_count(0))
-  vim.api.nvim_win_set_cursor(0, { line, 0 })
-  vim.cmd("normal! zz")
+  M.reveal(task, entry.path, hunk and math.max(1, hunk[3]) or 1)
 end
 
 function M.refresh_changes(task)

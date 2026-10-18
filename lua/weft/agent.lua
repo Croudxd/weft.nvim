@@ -218,6 +218,24 @@ function M.repair_display(chat)
   clean_saved_display(chat, { lines = lines, messages = chat.messages })
 end
 
+local function set_status(task, chat, status)
+  M.status[task.id] = status
+  if not chat or not vim.api.nvim_buf_is_valid(chat.bufnr) then
+    return
+  end
+  local label = " Weft · " .. task.name
+  if status == "working" then
+    label = label .. "  ● working"
+  elseif status == "stopped" then
+    label = label .. "  ● stopped"
+  end
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_get_buf(win) == chat.bufnr then
+      vim.wo[win].winbar = label
+    end
+  end
+end
+
 local function ensure_workspace_tool(chat)
   local registry = chat.tool_registry
   local name = "weft_workspace"
@@ -258,18 +276,18 @@ function M.get(task)
         current:set_system_prompt(prompt(task))
         return true
       end,
-      on_submitted = function()
-        M.status[task.id] = "working"
+      on_submitted = function(current)
+        set_status(task, current, "working")
       end,
-      on_completed = function()
+      on_completed = function(current)
         if M.status[task.id] ~= "stopped" then
-          M.status[task.id] = "ready"
+          set_status(task, current, "ready")
         end
         M.save(task)
         require("weft.changes").scan(task)
       end,
-      on_cancelled = function()
-        M.status[task.id] = "stopped"
+      on_cancelled = function(current)
+        set_status(task, current, "stopped")
       end,
     },
   })
@@ -375,6 +393,7 @@ function M.toggle(task, options)
   local win = vim.api.nvim_get_current_win()
   vim.api.nvim_win_set_width(win, math.max(30, math.floor(vim.o.columns * 0.35)))
   chat.ui:show_in_win({ winnr = win })
+  set_status(task, chat, M.status[task.id] or "ready")
 end
 
 function M.send(task)
