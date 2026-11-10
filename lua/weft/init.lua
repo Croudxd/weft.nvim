@@ -385,7 +385,6 @@ M.bindings = {
 
 local function highlights()
   vim.api.nvim_set_hl(0, "WeftAI", { default = true, bg = "#20352e" })
-  vim.api.nvim_set_hl(0, "WeftEdited", { default = true, bg = "#302f40" })
   vim.api.nvim_set_hl(0, "WeftRemoved", { default = true, link = "DiagnosticWarn" })
 end
 

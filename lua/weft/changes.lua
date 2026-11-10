@@ -3,29 +3,47 @@ local store = require("weft.store")
 local buffers = require("weft.buffers")
 local M = { states = {}, namespace = vim.api.nvim_create_namespace("weft.changes") }
 
-local function authorship(entry, content, actor)
-  local previous = entry.authorship_text or entry.before
-  local owners = entry.authorship or {}
-  local next_owners = {}
+-- Track only lines inserted by the agent. We deliberately do not infer who
+-- made every other edit: formatters, external tools, and normal diff alignment
+-- make a reliable per-line "user" label impossible.
+local function remap_ai_lines(previous, content, old_marks, mark_inserted)
+  local next_marks = {}
   local old_row, new_row = 1, 1
   for _, hunk in ipairs(vim.diff(previous, content, { result_type = "indices", algorithm = "histogram" })) do
     local old_start = hunk[1] + (hunk[2] == 0 and 1 or 0)
     local new_start = hunk[3] + (hunk[4] == 0 and 1 or 0)
     while old_row < old_start and new_row < new_start do
-      next_owners[new_row] = owners[old_row] or "user"
+      next_marks[new_row] = old_marks[old_row] == true
       old_row, new_row = old_row + 1, new_row + 1
     end
     for row = new_start, new_start + hunk[4] - 1 do
-      next_owners[row] = actor
+      next_marks[row] = mark_inserted
     end
     old_row, new_row = old_start + hunk[2], new_start + hunk[4]
   end
   local count = #util.lines(content)
   while new_row <= count do
-    next_owners[new_row] = owners[old_row] or "user"
+    next_marks[new_row] = old_marks[old_row] == true
     old_row, new_row = old_row + 1, new_row + 1
   end
-  entry.authorship, entry.authorship_text = next_owners, content
+  return next_marks
+end
+
+local function mark_ai_lines(entry, before, after)
+  local previous = entry.ai_text or entry.authorship_text or entry.before
+  local old_marks = entry.ai_lines or {}
+  if not entry.ai_lines and entry.authorship then
+    for row, owner in pairs(entry.authorship) do
+      old_marks[row] = owner == "ai"
+    end
+  end
+  -- First carry existing AI marks through user/external changes, without
+  -- labelling those edits. Then label only this agent write's inserted lines.
+  old_marks = remap_ai_lines(previous, before, old_marks, false)
+  entry.ai_lines = remap_ai_lines(before, after, old_marks, true)
+  entry.ai_text = after
+  -- Drop the old best-effort user/AI ownership data when this entry is saved.
+  entry.authorship, entry.authorship_text = nil, nil
 end
 
 function M.state(task)
@@ -71,8 +89,7 @@ end
 
 function M.record(task, path, before, after)
   local entry = M.capture(task, path, before)
-  authorship(entry, before or "", "user")
-  authorship(entry, after or "", "ai")
+  mark_ai_lines(entry, before or "", after or "")
   entry.ai_hash = vim.fn.sha256(after or "")
   entry.actor = "ai"
   entry.seen_hash = nil
@@ -123,9 +140,7 @@ function M.refresh_file(task, entry)
   entry.changed = current ~= entry.before or entry.deleted == entry.existed
   entry.hunks = entry.binary and {}
     or vim.diff(entry.before, current, { result_type = "indices", algorithm = "histogram" })
-  if not entry.binary then
-    authorship(entry, current, "user")
-  end
+
   if buffer >= 0 and vim.api.nvim_buf_is_loaded(buffer) then
     vim.api.nvim_buf_clear_namespace(buffer, M.namespace, 0, -1)
     local count = vim.api.nvim_buf_line_count(buffer)
@@ -133,13 +148,14 @@ function M.refresh_file(task, entry)
       local row = math.max(0, math.min(count - 1, hunk[3] - (hunk[4] > 0 and 1 or 0)))
       if hunk[4] > 0 then
         for current_row = row, math.min(count - 1, row + hunk[4] - 1) do
-          local group = entry.authorship[current_row + 1] == "ai" and "WeftAI" or "WeftEdited"
-          vim.api.nvim_buf_set_extmark(buffer, M.namespace, current_row, 0, {
-            sign_text = "▎",
-            sign_hl_group = group,
-            line_hl_group = group,
-            priority = 15,
-          })
+          if entry.ai_lines and entry.ai_lines[current_row + 1] then
+            vim.api.nvim_buf_set_extmark(buffer, M.namespace, current_row, 0, {
+              sign_text = "▎",
+              sign_hl_group = "WeftAI",
+              line_hl_group = "WeftAI",
+              priority = 15,
+            })
+          end
         end
       else
         vim.api.nvim_buf_set_extmark(buffer, M.namespace, row, 0, {
