@@ -117,7 +117,7 @@ require("weft").setup({
   model = "gpt-5.3-codex",
 
   mappings = true,
-  poll_interval = 2000, -- Set 0 to disable periodic Git reconciliation.
+  poll_interval = 0, -- Background Git polling is opt-in; agent writes refresh immediately.
 
   -- Follow saved agent edits in the centre source view.
   open_changed_files = false,
@@ -151,9 +151,10 @@ by default so agents never steal focus unless you ask them to.
 Task metadata, snapshots, and chat history live under
 `vim.fn.stdpath("data") .. "/weft"`, not in your repositories.
 
-The default `poll_interval` performs Git reconciliation every two seconds for
-known tasks. For very large repositories or many historical tasks, set it to
-`0`; agent writes and `<leader>wr` still refresh changes.
+Background Git polling is disabled by default so Weft never adds periodic
+editor work. Agent writes refresh changes immediately; use `<leader>wr` to
+reconcile external changes. Set a positive `poll_interval` only if you want
+periodic Git reconciliation.
 
 ## Development and CI
 
