@@ -130,16 +130,21 @@ end
 
 function M.delete(task, callback)
   assert(task and store.tasks[task.id], "Choose a Weft task first")
-  for _, repository in ipairs(task.repositories) do
-    local buffer = vim.fn.bufnr(repository.path .. "/source.lua")
-    if buffer >= 0 and vim.api.nvim_buf_is_loaded(buffer) and vim.bo[buffer].modified then
+  for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.b[buffer].weft_task == task.id and vim.bo[buffer].modified then
       return callback(nil, "Save or discard unsaved task buffers before deleting the task")
     end
   end
-  for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
-    local path = vim.api.nvim_buf_get_name(buffer)
-    if vim.b[buffer].weft_task == task.id and vim.bo[buffer].modified then
-      return callback(nil, "Save or discard unsaved task buffers before deleting the task")
+
+  -- Preflight every repository before removing any worktree. This avoids a
+  -- partially deleted task when one worktree contains ordinary uncommitted work.
+  for _, repository in ipairs(task.repositories) do
+    local status = vim.system({ "git", "-C", repository.path, "status", "--porcelain" }, { text = true }):wait()
+    if status.code ~= 0 then
+      return callback(nil, "Task worktree is missing or invalid: " .. repository.name)
+    end
+    if vim.trim(status.stdout) ~= "" then
+      return callback(nil, "Commit, discard, or move changes in " .. repository.name .. " before deleting the task")
     end
   end
 
@@ -159,8 +164,6 @@ function M.delete(task, callback)
         if result.code ~= 0 then
           return callback(nil, "Could not remove " .. repository.name .. ": " .. result.stderr)
         end
-        -- This branch was created exclusively for the task. Force deletion is
-        -- intentional here; task deletion is the explicit discard operation.
         local branch = vim.system({ "git", "-C", repository.source, "branch", "-D", repository.branch }, { text = true }):wait()
         if branch.code ~= 0 then
           return callback(nil, "Removed worktree but could not remove branch " .. repository.branch .. ": " .. branch.stderr)
