@@ -8,6 +8,13 @@ function M.path(path)
   return vim.fs.normalize(vim.fn.fnamemodify(vim.fn.expand(path), ":p")):gsub("/$", "")
 end
 
+-- Paths received from an agent are never shell/Vim-expanded. `expand()` treats
+-- glob characters specially and evaluates backticks, neither of which belongs
+-- in a filesystem permission check.
+function M.absolute(path)
+  return (vim.fs.normalize(vim.fs.abspath(path)):gsub("/$", ""))
+end
+
 function M.inside(path, root)
   return path == root or path:sub(1, #root + 1) == root .. "/"
 end

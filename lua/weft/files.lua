@@ -5,7 +5,7 @@ local M = {}
 function M.resolve(task, relative)
   assert(type(relative) == "string" and relative ~= "", "A workspace-relative path is required")
   assert(not relative:find("\0", 1, true) and relative:sub(1, 1) ~= "/", "Use a workspace-relative path")
-  local path = util.path(task.root .. "/" .. relative)
+  local path = util.absolute(task.root .. "/" .. relative)
   assert(util.inside(path, task.root), "Path escapes this task")
   local probe = path
   while not vim.uv.fs_lstat(probe) do
@@ -27,7 +27,7 @@ function M.read(task, relative)
   local stat = vim.uv.fs_stat(path)
   assert(not stat or stat.type == "file", "Not a regular file")
   assert(not stat or stat.size <= require("weft").config.max_file_bytes, "File is too large for a text tool")
-  local buffer = vim.fn.bufnr(path)
+  local buffer = vim.fn.bufexists(path) == 1 and vim.fn.bufadd(path) or -1
   local disk = util.read(path)
   local loaded = buffer >= 0 and vim.api.nvim_buf_is_loaded(buffer)
   if loaded then
