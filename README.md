@@ -1,128 +1,220 @@
 # weft.nvim
 
-Weft gives coding tasks an isolated Git worktree, an agent chat, a source view,
-and a focused change list—all inside Neovim.
+**Let an agent change code without losing track of what it touched.**
 
-The agent edits ordinary files in a task worktree. You keep normal buffers, LSP,
-search, terminals, and Git tooling; Weft tracks what changed and makes it easy
-to review it.
+Weft is a Neovim workflow for agent-assisted coding. It gives a coding job its
+own Git worktree, chat, changed-file list, and source windows. You work with
+ordinary editable files, normal LSP navigation, your usual terminal, and your
+usual Git commands—not a patch-only review screen.
 
-## What it does
+## Why use Weft?
 
-- Creates an isolated Git worktree only for repositories included in a task.
-- Keeps each task in its own Neovim tabpage and working directory.
-- Provides an agent chat backed by any CodeCompanion adapter you configure.
-- Shows changed files on the left, editable source in the centre, and chat on
-the right.
-- Marks AI-written and subsequently user-edited lines separately.
-- Keeps task chats, snapshots, and change history outside source repositories.
-- Compacts large chats before they become slow or reach provider context limits.
+Most coding agents can edit whichever directory you point them at. That is fast,
+but it is easy to lose your place or accidentally mix agent work with the branch
+you were already using.
+
+Weft makes the safe thing convenient:
+
+- Your original checkout is left alone.
+- Agent edits happen in a separate Git worktree on a separate branch.
+- Every task has its own Neovim tab, chat, changed-file list, and working
+  directory.
+- You can open and edit the actual resulting files in the centre pane.
+- If work later crosses into another repository, add it to the same task without
+  restarting the conversation.
+- The agent never creates worktrees or expands task scope by itself. Those are
+  explicit actions you confirm in Neovim.
+
+It is useful when you want the convenience of an agent without giving up a clean
+working tree or the ability to inspect every change as it happens.
+
+## What a task looks like
+
+A task is a folder containing the worktrees it is allowed to use. Most tasks
+start with one repository:
+
+```text
+~/dev/worktrees/fix-chat-scroll/       # one Weft task
+└── weft.nvim/                         # an isolated Git worktree
+```
+
+If the task later needs another repository, add it explicitly:
+
+```text
+~/dev/worktrees/fix-chat-scroll/
+├── weft.nvim/                         # first repository
+└── quantum/                           # added later to the same task
+```
+
+The chat can then work across both repositories. It still cannot touch your
+original checkouts or another task's worktrees:
+
+```text
+~/dev/weft.nvim/                       # original checkout: untouched
+~/dev/quantum/                         # original checkout: untouched
+~/dev/worktrees/another-task/          # another task: inaccessible
+```
+
+Git shares object storage with the original checkout, so a worktree is not a
+second copy of repository history. Extra disk usage is mainly checked-out files
+and anything created inside the worktree such as build artefacts or dependencies.
 
 ## Requirements
 
 - Neovim 0.12+
 - Git
 - [CodeCompanion.nvim](https://github.com/olimorris/codecompanion.nvim)
-- Tree-sitter `markdown` and `markdown_inline`
-- An authenticated/configured CodeCompanion adapter for chat
+- Tree-sitter parsers for `markdown` and `markdown_inline`
+- A configured CodeCompanion provider for chat
 
-Weft deliberately does **not** manage API keys or authentication. Configure
-providers exactly as CodeCompanion documents. The included Lazy example uses the
-community Codex OAuth adapter as a convenient ChatGPT default, but Weft can use
-any configured CodeCompanion provider.
+Weft does **not** manage API keys or provider login. Configure providers exactly
+as CodeCompanion documents. The bundled Lazy example includes Codex OAuth as a
+convenient ChatGPT default, but Weft can use any CodeCompanion adapter you have
+configured.
 
 ## Install
 
-Copy [`examples/lazy.lua`](examples/lazy.lua) into your Lazy configuration. For
-local development, point `dir` at your checkout.
+Copy [`examples/lazy.lua`](examples/lazy.lua) into your Lazy configuration.
+Then run `:Lazy sync`.
 
 If you already configure CodeCompanion, merge
-`require("weft.agent").codecompanion_options()` into its options. Configure any
-additional providers there; Weft discovers them from CodeCompanion.
+`require("weft.agent").codecompanion_options()` into its options. Additional
+providers belong in that existing CodeCompanion configuration; Weft discovers
+and offers them in its provider/model picker.
 
-## Start a task
+## First task
 
-Register each original repository once from **`<leader>wW` → Repositories →
-Add repository**. The path defaults to your current working directory. The
-command equivalent is:
+### 1. Register a repository
 
-```vim
-:Weft repo add ~/dev/app
-:Weft repo add ~/dev/service
-```
-
-Create a task with **`<leader>wn`** or:
-
-```vim
-:Weft new fix-login
-```
-
-Choose the repository for the task. It starts with only that repository:
+Open the Weft command centre with **`<leader>wW`** and choose:
 
 ```text
-~/dev/worktrees/
-└── fix-login/
-    └── app/               # Git worktree for ~/dev/app
+Repositories → Add repository
 ```
 
-If a task later needs another registered repository, use
-**`<leader>wA`** or **`<leader>wW` → Add repository to task**. This is a
-user-confirmed deterministic action; the AI cannot add repositories or create
-worktrees itself.
+Enter the path to the repository root. This only records the original checkout
+as an available source for future tasks; it does not create a worktree or change
+the repository.
 
-Git shares object storage between a worktree and its original repository. The
-extra disk use is primarily the checked-out files plus any dependencies/build
-artefacts created inside the task. The AI does not create worktrees: Weft only
-runs normal Git worktree commands after you explicitly create a task.
+The command-line equivalent is:
 
-## Daily use
+```vim
+:Weft repo add ~/dev/weft.nvim
+```
+
+### 2. Create a task
+
+Press **`<leader>wn`**:
+
+```text
+New task name: fix-chat-scroll
+Choose repository: weft.nvim
+```
+
+Weft creates a branch named `weft/fix-chat-scroll` and its isolated worktree
+under your configured `worktree_root`, then opens a new tab with:
+
+```text
+┌──────────────┬────────────────────────────┬─────────────────────┐
+│ Changes      │ Source file                │ Weft chat           │
+│              │ normal editable buffer     │ write below “Me”    │
+│ Enter = open │ normal LSP and navigation  │ Ctrl-S = send       │
+└──────────────┴────────────────────────────┴─────────────────────┘
+```
+
+### 3. Work normally
+
+Write a request below the final **Me** heading in chat and press **Ctrl-S**.
+The agent updates the worktree; Weft updates the changed-file list and marks
+agent-written lines green. The chat winbar shows `● working` while it is active.
+
+Open any changed file with **Enter** in the changes pane. You are looking at a
+normal source buffer, so use your usual motions, LSP commands, search, terminal,
+and Git tooling.
+
+## When a task needs another repository
+
+Suppose you begin in `etrading`, then discover the change also needs `quantum`.
+You do **not** need a new task or chat.
+
+Press **`<leader>wA`** in the task, choose `quantum`, and Weft creates a sibling
+worktree inside the current task. The active chat keeps its conversation and is
+updated with the new repository scope.
+
+This is intentionally deterministic plugin code. The model can suggest that a
+second repository is needed, but it cannot add a repository, create a branch, or
+run Git worktree lifecycle operations on its own.
+
+## Daily shortcuts
+
+Your leader key is whatever your Neovim setup uses.
 
 | Binding | Action |
 | --- | --- |
-| `<leader>ww` | Pick a task and open its workspace |
 | `<leader>wW` | Open the Weft command centre |
-| `<leader>wm` | Pick provider and model for this task |
-| `<leader>wc` | Toggle chat |
-| `<leader>wl` | Toggle changes |
-| `<leader>wb` | Pick a task source buffer |
-| `<leader>ws` | Send chat prompt |
-| `<leader>wk` | Stop the agent |
-| `<leader>wo` | Toggle previous-code preview |
-| `<leader>wr` | Refresh changes |
+| `<leader>ww` | Pick and open an existing task |
+| `<leader>wn` | Create a task |
 | `<leader>wA` | Add a registered repository to the current task |
+| `<leader>wm` | Choose provider and model for the current task |
+| `<leader>wc` | Toggle chat |
+| `<leader>ws` | Send the task chat prompt |
+| `<leader>wk` | Stop the running agent |
+| `<leader>wl` | Toggle the changes pane |
+| `<leader>wb` | Pick a source buffer belonging to the task |
+| `<leader>wo` | Show code from before the task started |
+| `<leader>wr` | Re-scan changes from disk/Git |
 | `]a` / `[a` | Next / previous changed hunk |
 
-In chat, write below the final **Me** heading and press **Ctrl-S** to send.
-The chat winbar shows when Weft is working or stopped. Chat displays concise
-tool activity rather than raw hashes, tool JSON, or token bookkeeping.
+Inside the changes pane:
 
-`<leader>wm` (or `:Weft model`) first selects a configured CodeCompanion
-provider, then one of that provider's models. The choice persists per task.
-Provider authentication and model availability remain CodeCompanion's concern.
+| Key | Action |
+| --- | --- |
+| `Enter` | Open the file or hunk under the cursor |
+| `o` | Open its previous contents |
+| `s` | Mark the current file revision as reviewed |
+| `r` | Refresh the list |
 
-In the changes panel, **Enter** opens the selected file, `o` opens its previous
-contents, `s` marks it reviewed, and `r` refreshes. Green line markers indicate
-lines written through the agent; other changes are left uncoloured. A deletion
-is shown with a removal marker and can be inspected with `<leader>wo`.
+Green markers show lines written through the agent. Other changed lines are left
+uncoloured rather than being guessed as “user edits.” Removed lines have a small
+removal marker; use `<leader>wo` to inspect their previous contents.
+
+## Models and providers
+
+Use **`<leader>wm`** or `:Weft model`:
+
+```text
+Choose provider → choose model → continue this task
+```
+
+The choice is saved per task. Weft uses your configured CodeCompanion adapters;
+provider authentication and available model lists remain CodeCompanion's job.
 
 ## Configuration
 
 ```lua
 require("weft").setup({
+  -- Where task folders are created.
   worktree_root = "~/dev/worktrees",
+
+  -- Registered repositories can also be added through the command centre.
   repositories = {},
 
-  -- Default CodeCompanion provider/model for new task chats.
+  -- Default CodeCompanion provider/model for a new task chat.
   adapter = "weft_codex",
   model = "gpt-5.3-codex",
 
   mappings = true,
-  poll_interval = 0, -- Background Git polling is opt-in; agent writes refresh immediately.
 
-  -- Follow saved agent edits in the centre source view.
+  -- Agent writes refresh immediately. Keep this at 0 unless you specifically
+  -- want repeated Git scans to notice unrelated external changes.
+  poll_interval = 0,
+
+  -- Follow saved agent writes in the source pane. Disabled by default so an
+  -- agent does not move your focus unless you ask for it.
   open_changed_files = false,
 
-  -- Do not override another tabline/bufferline plugin by default.
+  -- Use Weft's simple task-named tabline. Off by default so it does not replace
+  -- another tabline/bufferline plugin.
   tabline = false,
 
   context = {
@@ -132,35 +224,38 @@ require("weft").setup({
     keep_tool_cycles = 3,
   },
 
-  -- Optional integration points:
+  -- Optional integrations:
   -- picker = function(items, options, callback) ... end,
   -- browser = function(root) ... end,
 })
 ```
 
-Weft uses, in order: a configured `picker`, Telescope when installed, then
-`vim.ui.select`. Set `mappings = false` to define your own mappings with the
-public Lua functions such as `require("weft").tasks()`, `.open()`, and `.menu()`.
+For selection UIs, Weft uses your `picker` callback when supplied, otherwise
+Telescope when installed, otherwise `vim.ui.select`. Set `mappings = false` to
+provide your own mappings using public functions such as
+`require("weft").tasks()`, `.new()`, `.open()`, and `.menu()`.
 
 When `open_changed_files = true`, a saved agent write opens its source buffer,
-puts the cursor at the start of the write, and centres that line. It is disabled
-by default so agents never steal focus unless you ask them to.
+places the cursor at the start of the write, and centres that line.
 
 ## Storage and performance
 
-Task metadata, snapshots, and chat history live under
-`vim.fn.stdpath("data") .. "/weft"`, not in your repositories.
+Task metadata, baseline snapshots, and chat history are stored outside your
+repositories under:
 
-Background Git polling is disabled by default so Weft never adds periodic
-editor work. Agent writes refresh changes immediately; use `<leader>wr` to
-reconcile external changes. Set a positive `poll_interval` only if you want
-periodic Git reconciliation.
+```text
+vim.fn.stdpath("data") .. "/weft"
+```
 
-## Development and CI
+Weft does not poll Git by default, so it does not add periodic editor work while
+you type. Agent writes refresh immediately. If files change outside Weft—through
+a terminal, formatter, or another editor—press `<leader>wr` to reconcile them.
 
-The `tests/` directory is only development/CI code. Plugin managers load
-`lua/weft/` at runtime; they do **not** load or run the test suite for users.
-No test dependencies are included in a user's installed plugin.
+## Development
+
+The `tests/` directory is development and CI code only. Plugin managers load
+`lua/weft/` at runtime; users do not run the test suite or install test-only
+dependencies.
 
 ```text
 make test        # workspace/change integration tests
