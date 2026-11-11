@@ -84,6 +84,32 @@ function M.new(name, selected)
   end)
 end
 
+function M.delete(task)
+  task = task or current()
+  vim.ui.input({ prompt = "Delete task " .. task.name .. "? Type its name to confirm: " }, util.guard(function(value)
+    if not value then
+      return
+    end
+    if value ~= task.name then
+      return util.notify("Task was not deleted: confirmation did not match", vim.log.levels.WARN)
+    end
+    workspace.delete(task, function(ok, error_message)
+      if not ok then
+        return util.notify(error_message, vim.log.levels.ERROR)
+      end
+      for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+        local matches, id = pcall(vim.api.nvim_tabpage_get_var, tab, "weft_task")
+        if matches and id == task.id then
+          vim.api.nvim_set_current_tabpage(tab)
+          vim.cmd("tabclose!")
+          break
+        end
+      end
+      util.notify("Deleted task " .. task.name .. " and its worktrees")
+    end)
+  end))
+end
+
 function M.add_to_task()
   local task = current()
   local choices = {}
@@ -278,6 +304,9 @@ function M.menu()
     add("Add repository to task", "Create another isolated repository worktree", function()
       M.add_to_task()
     end)
+    add("Delete task", "Remove its worktrees, branch, and saved state", function()
+      M.delete(task)
+    end)
   end
   add("Switch task", "Choose another Weft task", function()
     M.tasks()
@@ -433,6 +462,13 @@ M.bindings = {
     "Add repository to current task",
   },
   {
+    "<leader>wd",
+    function()
+      M.delete()
+    end,
+    "Delete current task",
+  },
+  {
     "<leader>wr",
     function()
       require("weft.changes").scan(current())
@@ -553,6 +589,7 @@ local function command(args)
     stop = function()
       require("weft.agent").stop(current())
     end,
+    delete = M.delete,
     hide = M.hide,
     help = function()
       require("weft.ui").help(workspace.current() or { id = "global", name = "Weft" })
@@ -585,6 +622,7 @@ function M.complete(lead, line, cursor)
       "browse",
       "send",
       "stop",
+      "delete",
       "hide",
       "help",
       "model",

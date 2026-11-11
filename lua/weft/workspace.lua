@@ -128,6 +128,50 @@ function M.add_to_task(task, repository_name, options, callback)
   )
 end
 
+function M.delete(task, callback)
+  assert(task and store.tasks[task.id], "Choose a Weft task first")
+  for _, repository in ipairs(task.repositories) do
+    local buffer = vim.fn.bufnr(repository.path .. "/source.lua")
+    if buffer >= 0 and vim.api.nvim_buf_is_loaded(buffer) and vim.bo[buffer].modified then
+      return callback(nil, "Save or discard unsaved task buffers before deleting the task")
+    end
+  end
+  for _, buffer in ipairs(vim.api.nvim_list_bufs()) do
+    local path = vim.api.nvim_buf_get_name(buffer)
+    if vim.b[buffer].weft_task == task.id and vim.bo[buffer].modified then
+      return callback(nil, "Save or discard unsaved task buffers before deleting the task")
+    end
+  end
+
+  local function remove(index)
+    local repository = task.repositories[index]
+    if not repository then
+      store.tasks[task.id] = nil
+      store.save()
+      vim.fn.delete(store.task_directory(task), "rf")
+      pcall(vim.uv.fs_rmdir, task.root)
+      return callback(true)
+    end
+    vim.system(
+      { "git", "-C", repository.source, "worktree", "remove", repository.path },
+      { text = true },
+      vim.schedule_wrap(function(result)
+        if result.code ~= 0 then
+          return callback(nil, "Could not remove " .. repository.name .. ": " .. result.stderr)
+        end
+        -- This branch was created exclusively for the task. Force deletion is
+        -- intentional here; task deletion is the explicit discard operation.
+        local branch = vim.system({ "git", "-C", repository.source, "branch", "-D", repository.branch }, { text = true }):wait()
+        if branch.code ~= 0 then
+          return callback(nil, "Removed worktree but could not remove branch " .. repository.branch .. ": " .. branch.stderr)
+        end
+        remove(index + 1)
+      end)
+    )
+  end
+  remove(1)
+end
+
 function M.current()
   local id = vim.t.weft_task
   return id and store.tasks[id] or nil

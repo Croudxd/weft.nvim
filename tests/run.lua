@@ -289,6 +289,23 @@ local function run()
     equal(vim.fn.getcwd(), task_a.root)
     assert(vim.bo[vim.fn.bufnr(path_a)].modified)
   end)
+  test("deleting a task removes its worktrees, branches, and saved state", function()
+    local disposable = create("dispose", { "engine" })
+    require("weft.changes").state(disposable)
+    require("weft.changes").save(disposable)
+    local done, removed, failure
+    require("weft.workspace").delete(disposable, function(result, message)
+      removed, failure, done = result, message, true
+    end)
+    assert(vim.wait(10000, function()
+      return done
+    end, 10), "Timed out deleting task")
+    assert(removed, failure)
+    assert(not vim.uv.fs_stat(disposable.root))
+    assert(not require("weft.store").tasks.dispose)
+    local branch = vim.system({ "git", "-C", second, "show-ref", "--verify", "--quiet", "refs/heads/weft/dispose" }):wait()
+    equal(branch.code, 1)
+  end)
   test("task and snapshot persistence lives outside the source repositories", function()
     changes.save(task_a)
     changes.states = {}

@@ -145,6 +145,14 @@ This is intentionally deterministic plugin code. The model can suggest that a
 second repository is needed, but it cannot add a repository, create a branch, or
 run Git worktree lifecycle operations on its own.
 
+## Deleting a task
+
+Use **`<leader>wd`** or choose **Delete task** in the command centre. Type the
+task name exactly to confirm. Weft refuses to delete a task with unsaved source
+buffers. On confirmation it removes every task worktree, deletes its `weft/TASK`
+branches, and removes the task's saved chat and change state. Original
+repositories and registered-repository settings are left untouched.
+
 ## Daily shortcuts
 
 Your leader key is whatever your Neovim setup uses.
@@ -155,6 +163,7 @@ Your leader key is whatever your Neovim setup uses.
 | `<leader>ww` | Pick and open an existing task |
 | `<leader>wn` | Create a task |
 | `<leader>wA` | Add a registered repository to the current task |
+| `<leader>wd` | Delete the current task after typing its name to confirm |
 | `<leader>wm` | Choose provider and model for the current task |
 | `<leader>wc` | Toggle chat |
 | `<leader>ws` | Send the task chat prompt |
