@@ -405,6 +405,7 @@ function M.toggle(task, options)
 end
 
 function M.send(task)
+  assert(M.status[task.id] ~= "working", "The agent is still working on the previous request")
   local chat = M.get(task)
   local found
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do

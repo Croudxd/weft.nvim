@@ -61,6 +61,7 @@ function M.write(task, args)
   assert(not entry.disk_conflict, "Disk and unsaved buffer have diverged; resolve the external edit first")
   local after = args.content
   local changed_line = 1
+  local dirty = buffer >= 0 and vim.bo[buffer].modified
   if args.action == "replace" then
     assert(type(args.old_text) == "string" and args.old_text ~= "", "old_text must not be empty")
     assert(before, "Cannot replace text in a missing file")
@@ -87,12 +88,15 @@ function M.write(task, args)
   else
     assert(type(after) == "string" and not after:find("\0", 1, true), "content must be text")
     assert(#after <= require("weft").config.max_file_bytes, "Result exceeds the text file size limit")
-    local dirty = buffer >= 0 and vim.bo[buffer].modified
     buffer = require("weft.buffers").load(task, path)
     util.set_text(buffer, after)
     if not dirty then
-      util.write(path, after)
-      vim.bo[buffer].modified = false
+      -- Save through the buffer rather than writing behind Neovim's back. This
+      -- keeps file-change detection, undo state, and normal :write behaviour
+      -- coherent for an already visible source buffer.
+      vim.api.nvim_buf_call(buffer, function()
+        vim.cmd("silent write")
+      end)
       vim.b[buffer].weft_disk_hash = vim.fn.sha256(after)
     end
   end

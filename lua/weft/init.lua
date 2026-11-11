@@ -664,6 +664,16 @@ function M.setup(options)
       require("weft.buffers").enter(event.buf)
     end,
   })
+  vim.api.nvim_create_autocmd("BufWritePost", {
+    group = group,
+    callback = function(event)
+      local path = vim.api.nvim_buf_get_name(event.buf)
+      local disk = path ~= "" and util.read(path)
+      if disk then
+        vim.b[event.buf].weft_disk_hash = vim.fn.sha256(disk)
+      end
+    end,
+  })
   vim.api.nvim_create_autocmd("ColorScheme", { group = group, callback = highlights })
   vim.api.nvim_create_autocmd("VimLeavePre", {
     group = group,
