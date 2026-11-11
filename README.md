@@ -9,7 +9,7 @@ to review it.
 
 ## What it does
 
-- Creates a Git worktree for every registered repository in a task.
+- Creates an isolated Git worktree only for repositories included in a task.
 - Keeps each task in its own Neovim tabpage and working directory.
 - Provides an agent chat backed by any CodeCompanion adapter you configure.
 - Shows changed files on the left, editable source in the centre, and chat on
@@ -51,20 +51,24 @@ command equivalent is:
 :Weft repo add ~/dev/service
 ```
 
-Create and open a task:
+Create a task with **`<leader>wn`** or:
 
 ```vim
 :Weft new fix-login
 ```
 
-This creates sibling worktrees:
+Choose the repository for the task. It starts with only that repository:
 
 ```text
 ~/dev/worktrees/
-└── fix-login/             # task name
-    ├── app/               # Git worktree for ~/dev/app
-    └── service/           # Git worktree for ~/dev/service
+└── fix-login/
+    └── app/               # Git worktree for ~/dev/app
 ```
+
+If a task later needs another registered repository, use
+**`<leader>wA`** or **`<leader>wW` → Add repository to task**. This is a
+user-confirmed deterministic action; the AI cannot add repositories or create
+worktrees itself.
 
 Git shares object storage between a worktree and its original repository. The
 extra disk use is primarily the checked-out files plus any dependencies/build
@@ -85,6 +89,7 @@ runs normal Git worktree commands after you explicitly create a task.
 | `<leader>wk` | Stop the agent |
 | `<leader>wo` | Toggle previous-code preview |
 | `<leader>wr` | Refresh changes |
+| `<leader>wA` | Add a registered repository to the current task |
 | `]a` / `[a` | Next / previous changed hunk |
 
 In chat, write below the final **Me** heading and press **Ctrl-S** to send.
@@ -97,8 +102,8 @@ Provider authentication and model availability remain CodeCompanion's concern.
 
 In the changes panel, **Enter** opens the selected file, `o` opens its previous
 contents, `s` marks it reviewed, and `r` refreshes. Green line markers indicate
-AI-written lines; purple markers identify later user edits. A deletion is shown
-with a removal marker and can be inspected with `<leader>wo`.
+lines written through the agent; other changes are left uncoloured. A deletion
+is shown with a removal marker and can be inspected with `<leader>wo`.
 
 ## Configuration
 

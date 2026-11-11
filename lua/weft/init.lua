@@ -45,18 +45,35 @@ local function current()
   return task
 end
 
-function M.new(name)
+function M.new(name, selected)
   if not name or name == "" then
     return vim.ui.input(
       { prompt = "New Weft task: " },
       util.guard(function(value)
         if value and value ~= "" then
-          M.new(value)
+          M.new(value, selected)
         end
       end)
     )
   end
-  workspace.create(name, M.config, function(task, error_message)
+  if not selected then
+    local repositories = vim.tbl_keys(store.repositories)
+    table.sort(repositories)
+    if #repositories == 0 then
+      return util.notify("Add a repository first: <leader>wW → Repositories → Add repository", vim.log.levels.WARN)
+    end
+    return M.select(repositories, {
+      prompt = "Weft · " .. name .. " · repository",
+      format_item = function(repository)
+        return repository .. "  " .. store.repositories[repository]
+      end,
+    }, util.guard(function(repository)
+      if repository then
+        M.new(name, { repository })
+      end
+    end))
+  end
+  workspace.create(name, M.config, selected, function(task, error_message)
     if not task then
       return util.notify(error_message, vim.log.levels.ERROR)
     end
@@ -65,6 +82,42 @@ function M.new(name)
     util.notify("Created task " .. task.name .. " · " .. #task.repositories .. " repositories")
     util.guard(M.open)(task)
   end)
+end
+
+function M.add_to_task()
+  local task = current()
+  local choices = {}
+  for name in pairs(store.repositories) do
+    local included = false
+    for _, repository in ipairs(task.repositories) do
+      included = included or repository.name == name
+    end
+    if not included then
+      table.insert(choices, name)
+    end
+  end
+  table.sort(choices)
+  if #choices == 0 then
+    return util.notify("All registered repositories are already in this task")
+  end
+  M.select(choices, {
+    prompt = "Weft · " .. task.name .. " · add repository",
+    format_item = function(name)
+      return name .. "  " .. store.repositories[name]
+    end,
+  }, util.guard(function(name)
+    if not name then
+      return
+    end
+    workspace.add_to_task(task, name, M.config, function(repository, error_message)
+      if not repository then
+        return util.notify(error_message, vim.log.levels.ERROR)
+      end
+      require("weft.agent").refresh_prompt(task)
+      require("weft.changes").scan(task)
+      util.notify("Added " .. repository.name .. " to " .. task.name)
+    end)
+  end))
 end
 
 function M._tabline()
@@ -222,6 +275,9 @@ function M.menu()
       M.config.load_chat()
       require("weft.agent").pick_model(task)
     end)
+    add("Add repository to task", "Create another isolated repository worktree", function()
+      M.add_to_task()
+    end)
   end
   add("Switch task", "Choose another Weft task", function()
     M.tasks()
@@ -368,6 +424,13 @@ M.bindings = {
       require("weft.agent").attach(current())
     end,
     "Attach current task buffer",
+  },
+  {
+    "<leader>wA",
+    function()
+      M.add_to_task()
+    end,
+    "Add repository to current task",
   },
   {
     "<leader>wr",

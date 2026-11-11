@@ -43,9 +43,9 @@ local function repository(name)
   return path
 end
 
-local function create(name)
+local function create(name, selected)
   local done, task, failure
-  require("weft.workspace").create(name, require("weft").config, function(result, message)
+  require("weft.workspace").create(name, require("weft").config, selected, function(result, message)
     task, failure, done = result, message, true
   end)
   assert(
@@ -86,13 +86,23 @@ local function run()
     mappings = false,
   })
   local task_a, task_b
-  test("two tasks isolate every repository and leave original dirty work alone", function()
-    task_a, task_b = create("task-a"), create("task-b")
+  test("tasks start with selected repositories and can grow without touching originals", function()
+    task_a, task_b = create("task-a", { "app" }), create("task-b", { "app", "engine" })
     equal(util.read(task_a.root .. "/app/source.lua"), "local value = 1\nreturn value\n")
     equal(util.read(first .. "/source.lua"), "unfinished original work\n")
+    equal(#task_a.repositories, 1)
+    assert(not vim.uv.fs_stat(task_a.root .. "/engine"))
+    equal(vim.trim(util.git(first, { "branch", "--show-current" })), "main")
+    local done, added, failure
+    require("weft.workspace").add_to_task(task_a, "engine", require("weft").config, function(result, message)
+      added, failure, done = result, message, true
+    end)
+    assert(vim.wait(10000, function()
+      return done
+    end, 10), "Timed out adding repository")
+    assert(added, failure)
     equal(#task_a.repositories, 2)
     assert(vim.uv.fs_stat(task_a.root .. "/engine/.git"))
-    equal(vim.trim(util.git(first, { "branch", "--show-current" })), "main")
   end)
   local files = require("weft.files")
   local changes = require("weft.changes")

@@ -372,6 +372,14 @@ function M.get(task)
   return chat
 end
 
+function M.refresh_prompt(task)
+  local chat = M.chats[task.id]
+  if chat then
+    chat:set_system_prompt(prompt(task))
+    M.save(task)
+  end
+end
+
 function M.toggle(task, options)
   local chat = M.get(task)
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do

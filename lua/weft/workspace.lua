@@ -17,35 +17,29 @@ function M.add_repository(path, name)
   return name
 end
 
-local function validate(name, options)
+local function repository_task(name, root, repository_name, source, options)
+  source = util.path(source)
+  assert(not util.inside(options.worktree_root, source), "Worktree storage must be outside " .. source)
+  assert(not util.inside(source, options.worktree_root), "Register original repos, not task worktrees")
+  local base = vim.trim(util.git(source, { "rev-parse", "HEAD" }))
+  local branch = options.branch_prefix .. name
+  local exists = vim.system({ "git", "-C", source, "show-ref", "--verify", "--quiet", "refs/heads/" .. branch }):wait()
+  assert(exists.code == 1, "Branch already exists or cannot be checked: " .. branch .. " in " .. source)
+  assert(not util.read(source .. "/.gitmodules"), "Submodules are not supported yet: " .. source)
+  return { name = repository_name, source = source, path = root .. "/" .. repository_name, base = base, branch = branch }
+end
+
+local function validate(name, options, selected)
   assert(name and name:match("^[a-zA-Z0-9][a-zA-Z0-9_-]*$"), "Use a task name like fix-login-timeout")
   assert(not store.tasks[name] and not M.creating[name], "Task already exists: " .. name)
   local root = options.worktree_root .. "/" .. name
   assert(not vim.uv.fs_stat(root), "Directory already exists: " .. root)
+  assert(type(selected) == "table" and #selected > 0, "Choose a repository for this task")
   local repositories = {}
-  for repository_name, source in pairs(store.repositories) do
-    source = util.path(source)
-    assert(not util.inside(options.worktree_root, source), "Worktree storage must be outside " .. source)
-    assert(not util.inside(source, options.worktree_root), "Register original repos, not task worktrees")
-    local base = vim.trim(util.git(source, { "rev-parse", "HEAD" }))
-    local branch = options.branch_prefix .. name
-    local exists =
-      vim.system({ "git", "-C", source, "show-ref", "--verify", "--quiet", "refs/heads/" .. branch }):wait()
-    assert(exists.code == 1, "Branch already exists or cannot be checked: " .. branch .. " in " .. source)
-    -- Submodules need their own lifecycle before they can satisfy task isolation.
-    assert(not util.read(source .. "/.gitmodules"), "Submodules are not supported yet: " .. source)
-    table.insert(
-      repositories,
-      {
-        name = repository_name,
-        source = source,
-        path = root .. "/" .. repository_name,
-        base = base,
-        branch = branch,
-      }
-    )
+  for _, repository_name in ipairs(selected) do
+    local source = assert(store.repositories[repository_name], "Unknown repository: " .. repository_name)
+    table.insert(repositories, repository_task(name, root, repository_name, source, options))
   end
-  assert(#repositories > 0, "Add a repository first: :Weft repo add /path/to/repository")
   table.sort(repositories, function(a, b)
     return a.name < b.name
   end)
@@ -66,8 +60,12 @@ local function rollback(task, created, message, callback)
   callback(nil, message)
 end
 
-function M.create(name, options, callback)
-  local task = validate(name, options)
+function M.create(name, options, selected, callback)
+  if type(selected) == "function" then
+    callback, selected = selected, nil
+  end
+  selected = selected or vim.tbl_keys(store.repositories)
+  local task = validate(name, options, selected)
   M.creating[name] = true
   vim.fn.mkdir(task.root, "p")
   local created = {}
@@ -102,6 +100,32 @@ function M.create(name, options, callback)
     )
   end
   advance(1)
+end
+
+function M.add_to_task(task, repository_name, options, callback)
+  assert(task and store.tasks[task.id], "Choose a Weft task first")
+  local source = assert(store.repositories[repository_name], "Unknown repository: " .. repository_name)
+  for _, repository in ipairs(task.repositories) do
+    assert(repository.name ~= repository_name, "Repository is already in this task: " .. repository_name)
+  end
+  local repository = repository_task(task.name, task.root, repository_name, source, options)
+  M.creating[task.id] = true
+  vim.system(
+    { "git", "-C", repository.source, "worktree", "add", "-b", repository.branch, repository.path, repository.base },
+    { text = true },
+    vim.schedule_wrap(function(result)
+      M.creating[task.id] = nil
+      if result.code ~= 0 then
+        return callback(nil, result.stderr)
+      end
+      table.insert(task.repositories, repository)
+      table.sort(task.repositories, function(a, b)
+        return a.name < b.name
+      end)
+      store.save()
+      callback(repository)
+    end)
+  )
 end
 
 function M.current()
