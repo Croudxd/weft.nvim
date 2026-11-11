@@ -71,6 +71,51 @@ function M._tabline()
   return render_tabline()
 end
 
+function M.add_repository(path)
+  if not path or path == "" then
+    return vim.ui.input({ prompt = "Weft repository path: ", default = vim.fn.getcwd() }, util.guard(function(value)
+      if value and value ~= "" then
+        M.add_repository(value)
+      end
+    end))
+  end
+  local name = workspace.add_repository(path)
+  util.notify("Registered " .. name .. " for new tasks")
+end
+
+function M.repositories()
+  local items = {}
+  for name, path in pairs(store.repositories) do
+    table.insert(items, { name = name, path = path })
+  end
+  table.sort(items, function(a, b)
+    return a.name < b.name
+  end)
+  table.insert(items, 1, { add = true, name = "Add repository", path = "Register a Git repository" })
+  M.select(items, {
+    prompt = "Weft repositories",
+    format_item = function(item)
+      return item.name .. "  " .. item.path
+    end,
+  }, util.guard(function(item)
+    if not item then
+      return
+    end
+    if item.add then
+      return M.add_repository()
+    end
+    vim.ui.select({ "Remove" }, {
+      prompt = "Weft · " .. item.name,
+    }, util.guard(function(action)
+      if action == "Remove" then
+        store.repositories[item.name] = nil
+        store.save()
+        util.notify("Removed " .. item.name .. " from future tasks")
+      end
+    end))
+  end))
+end
+
 function M.select(items, options, callback)
   if M.config.picker then
     return M.config.picker(items, options, callback)
@@ -183,6 +228,9 @@ function M.menu()
   end)
   add("New task", "Create an isolated worktree and agent", function()
     M.new()
+  end)
+  add("Repositories", "Add or remove repositories used for new tasks", function()
+    M.repositories()
   end)
 
   local function select(action)
@@ -400,8 +448,7 @@ local function command(args)
     if args.fargs[2] == "add" then
       local path = table.concat(vim.list_slice(args.fargs, 3), " ")
       assert(path ~= "", "Usage: :Weft repo add /path/to/repository")
-      local name = workspace.add_repository(path)
-      return util.notify("Registered " .. name .. " for new tasks")
+      return M.add_repository(path)
     elseif args.fargs[2] == "remove" then
       local name = args.fargs[3]
       assert(name and store.repositories[name], "Specify a registered repository name")

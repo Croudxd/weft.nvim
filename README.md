@@ -3,7 +3,7 @@
 Weft gives coding tasks an isolated Git worktree, an agent chat, a source view,
 and a focused change list—all inside Neovim.
 
-T he agent edits ordinary files in a task worktree. You keep normal buffers, LSP,
+The agent edits ordinary files in a task worktree. You keep normal buffers, LSP,
 search, terminals, and Git tooling; Weft tracks what changed and makes it easy
 to review it.
 
@@ -42,7 +42,9 @@ additional providers there; Weft discovers them from CodeCompanion.
 
 ## Start a task
 
-Register each original repository once:
+Register each original repository once from **`<leader>wW` → Repositories →
+Add repository**. The path defaults to your current working directory. The
+command equivalent is:
 
 ```vim
 :Weft repo add ~/dev/app
