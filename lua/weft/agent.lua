@@ -457,7 +457,12 @@ function M.set_adapter(task, name)
 end
 
 function M.adapters(current)
-  return require("codecompanion.adapters.ui").get_adapters_list(current)
+  local names = require("codecompanion.adapters.ui").get_adapters_list(current)
+  local adapters = require("codecompanion.adapters")
+  return vim.tbl_filter(function(name)
+    local ok, adapter = pcall(adapters.resolve, name)
+    return ok and adapter.type == "http"
+  end, names)
 end
 
 function M.pick_model(task)
