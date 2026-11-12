@@ -128,6 +128,12 @@ function M.refresh_file(task, entry)
     entry.disk_conflict = true
     current = util.buffer_text(buffer)
   end
+  -- Preserve AI marks as user edits, formatters, and disk updates move lines.
+  -- New non-agent lines deliberately receive no marker.
+  if not entry.binary and entry.ai_text and entry.ai_text ~= current then
+    entry.ai_lines = remap_ai_lines(entry.ai_text, current, entry.ai_lines or {}, false)
+    entry.ai_text = current
+  end
   entry.current_hash = vim.fn.sha256(current)
   entry.changed = current ~= entry.before or entry.deleted == entry.existed
   entry.hunks = entry.binary and {}
