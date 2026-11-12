@@ -114,11 +114,23 @@ function M.delete(task)
         if not ok then
           return util.notify(error_message, vim.log.levels.ERROR)
         end
+        local agent = require("weft.agent")
+        local chat = agent.chats[task.id]
+        if chat then
+          chat:close()
+        end
+        agent.chats[task.id], agent.status[task.id] = nil, nil
+        local changes, ui = require("weft.changes"), require("weft.ui")
+        changes.states[task.id], ui.views[task.id], ui.last[task.id] = nil, nil, nil
         for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
           local matches, id = pcall(vim.api.nvim_tabpage_get_var, tab, "weft_task")
           if matches and id == task.id then
             vim.api.nvim_set_current_tabpage(tab)
-            vim.cmd("tabclose!")
+            if #vim.api.nvim_list_tabpages() > 1 then
+              vim.cmd("tabclose!")
+            else
+              vim.cmd("enew")
+            end
             break
           end
         end
