@@ -23,10 +23,17 @@ local function repository_task(name, root, repository_name, source, options)
   assert(not util.inside(source, options.worktree_root), "Register original repos, not task worktrees")
   local base = vim.trim(util.git(source, { "rev-parse", "HEAD" }))
   local branch = options.branch_prefix .. name
-  local exists = vim.system({ "git", "-C", source, "show-ref", "--verify", "--quiet", "refs/heads/" .. branch }):wait()
+  local exists =
+    vim.system({ "git", "-C", source, "show-ref", "--verify", "--quiet", "refs/heads/" .. branch }):wait()
   assert(exists.code == 1, "Branch already exists or cannot be checked: " .. branch .. " in " .. source)
   assert(not util.read(source .. "/.gitmodules"), "Submodules are not supported yet: " .. source)
-  return { name = repository_name, source = source, path = root .. "/" .. repository_name, base = base, branch = branch }
+  return {
+    name = repository_name,
+    source = source,
+    path = root .. "/" .. repository_name,
+    base = base,
+    branch = branch,
+  }
 end
 
 local function validate(name, options, selected)
@@ -111,7 +118,17 @@ function M.add_to_task(task, repository_name, options, callback)
   local repository = repository_task(task.name, task.root, repository_name, source, options)
   M.creating[task.id] = true
   vim.system(
-    { "git", "-C", repository.source, "worktree", "add", "-b", repository.branch, repository.path, repository.base },
+    {
+      "git",
+      "-C",
+      repository.source,
+      "worktree",
+      "add",
+      "-b",
+      repository.branch,
+      repository.path,
+      repository.base,
+    },
     { text = true },
     vim.schedule_wrap(function(result)
       M.creating[task.id] = nil
@@ -139,12 +156,17 @@ function M.delete(task, callback)
   -- Preflight every repository before removing any worktree. This avoids a
   -- partially deleted task when one worktree contains ordinary uncommitted work.
   for _, repository in ipairs(task.repositories) do
-    local status = vim.system({ "git", "-C", repository.path, "status", "--porcelain" }, { text = true }):wait()
+    local status = vim
+      .system({ "git", "-C", repository.path, "status", "--porcelain" }, { text = true })
+      :wait()
     if status.code ~= 0 then
       return callback(nil, "Task worktree is missing or invalid: " .. repository.name)
     end
     if vim.trim(status.stdout) ~= "" then
-      return callback(nil, "Commit, discard, or move changes in " .. repository.name .. " before deleting the task")
+      return callback(
+        nil,
+        "Commit, discard, or move changes in " .. repository.name .. " before deleting the task"
+      )
     end
   end
 
@@ -165,9 +187,14 @@ function M.delete(task, callback)
         if result.code ~= 0 then
           return callback(nil, "Could not remove " .. repository.name .. ": " .. result.stderr)
         end
-        local branch = vim.system({ "git", "-C", repository.source, "branch", "-D", repository.branch }, { text = true }):wait()
+        local branch = vim
+          .system({ "git", "-C", repository.source, "branch", "-D", repository.branch }, { text = true })
+          :wait()
         if branch.code ~= 0 then
-          return callback(nil, "Removed worktree but could not remove branch " .. repository.branch .. ": " .. branch.stderr)
+          return callback(
+            nil,
+            "Removed worktree but could not remove branch " .. repository.branch .. ": " .. branch.stderr
+          )
         end
         remove(index + 1)
       end)

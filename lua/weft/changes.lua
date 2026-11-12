@@ -48,8 +48,7 @@ end
 
 function M.state(task)
   if not M.states[task.id] then
-    M.states[task.id] =
-      util.load_json(store.task_directory(task) .. "/changes.json", { entries = {} })
+    M.states[task.id] = util.load_json(store.task_directory(task) .. "/changes.json", { entries = {} })
   end
   return M.states[task.id]
 end

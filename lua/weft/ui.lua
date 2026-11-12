@@ -79,9 +79,14 @@ function M.home(task)
   local buffer = scratch(task, "home", lines)
   vim.api.nvim_win_set_buf(0, buffer)
   views(task).home = { buffer = buffer, window = vim.api.nvim_get_current_win() }
-  vim.keymap.set("n", "<CR>", util.guard(function()
-    require("weft").open(task)
-  end), { buffer = buffer, desc = "Open Weft workspace" })
+  vim.keymap.set(
+    "n",
+    "<CR>",
+    util.guard(function()
+      require("weft").open(task)
+    end),
+    { buffer = buffer, desc = "Open Weft workspace" }
+  )
 end
 
 function M.source(task, buffer)
@@ -93,7 +98,10 @@ function M.source(task, buffer)
   -- buffers (notes, terminals, help) must never be commandeered by Weft.
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
     local candidate = vim.api.nvim_win_get_buf(win)
-    if vim.b[candidate].weft_task == task.id and (vim.bo[candidate].buftype == "" or vim.b[candidate].weft_view == "home") then
+    if
+      vim.b[candidate].weft_task == task.id
+      and (vim.bo[candidate].buftype == "" or vim.b[candidate].weft_view == "home")
+    then
       destination = win
       break
     end

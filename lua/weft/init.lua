@@ -35,7 +35,15 @@ local function render_tabline()
     local ok, task_id = pcall(vim.api.nvim_tabpage_get_var, tab, "weft_task")
     local task = ok and store.tasks[task_id]
     local label = task and task.name or "Tab " .. index
-    table.insert(labels, (tab == vim.api.nvim_get_current_tabpage() and "%#TabLineSel#" or "%#TabLine#") .. " " .. index .. " " .. label .. " ")
+    table.insert(
+      labels,
+      (tab == vim.api.nvim_get_current_tabpage() and "%#TabLineSel#" or "%#TabLine#")
+        .. " "
+        .. index
+        .. " "
+        .. label
+        .. " "
+    )
   end
   return table.concat(labels) .. "%#TabLineFill#"
 end
@@ -60,18 +68,25 @@ function M.new(name, selected)
     local repositories = vim.tbl_keys(store.repositories)
     table.sort(repositories)
     if #repositories == 0 then
-      return util.notify("Add a repository first: <leader>wW → Repositories → Add repository", vim.log.levels.WARN)
+      return util.notify(
+        "Add a repository first: <leader>wW → Repositories → Add repository",
+        vim.log.levels.WARN
+      )
     end
-    return M.select(repositories, {
-      prompt = "Weft · " .. name .. " · repository",
-      format_item = function(repository)
-        return repository .. "  " .. store.repositories[repository]
-      end,
-    }, util.guard(function(repository)
-      if repository then
-        M.new(name, { repository })
-      end
-    end))
+    return M.select(
+      repositories,
+      {
+        prompt = "Weft · " .. name .. " · repository",
+        format_item = function(repository)
+          return repository .. "  " .. store.repositories[repository]
+        end,
+      },
+      util.guard(function(repository)
+        if repository then
+          M.new(name, { repository })
+        end
+      end)
+    )
   end
   workspace.create(name, M.config, selected, function(task, error_message)
     if not task then
@@ -86,28 +101,31 @@ end
 
 function M.delete(task)
   task = task or current()
-  vim.ui.input({ prompt = "Delete task " .. task.name .. "? Type its name to confirm: " }, util.guard(function(value)
-    if not value then
-      return
-    end
-    if value ~= task.name then
-      return util.notify("Task was not deleted: confirmation did not match", vim.log.levels.WARN)
-    end
-    workspace.delete(task, function(ok, error_message)
-      if not ok then
-        return util.notify(error_message, vim.log.levels.ERROR)
+  vim.ui.input(
+    { prompt = "Delete task " .. task.name .. "? Type its name to confirm: " },
+    util.guard(function(value)
+      if not value then
+        return
       end
-      for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
-        local matches, id = pcall(vim.api.nvim_tabpage_get_var, tab, "weft_task")
-        if matches and id == task.id then
-          vim.api.nvim_set_current_tabpage(tab)
-          vim.cmd("tabclose!")
-          break
+      if value ~= task.name then
+        return util.notify("Task was not deleted: confirmation did not match", vim.log.levels.WARN)
+      end
+      workspace.delete(task, function(ok, error_message)
+        if not ok then
+          return util.notify(error_message, vim.log.levels.ERROR)
         end
-      end
-      util.notify("Deleted task " .. task.name .. " and its worktrees")
+        for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
+          local matches, id = pcall(vim.api.nvim_tabpage_get_var, tab, "weft_task")
+          if matches and id == task.id then
+            vim.api.nvim_set_current_tabpage(tab)
+            vim.cmd("tabclose!")
+            break
+          end
+        end
+        util.notify("Deleted task " .. task.name .. " and its worktrees")
+      end)
     end)
-  end))
+  )
 end
 
 function M.add_to_task()
@@ -126,24 +144,28 @@ function M.add_to_task()
   if #choices == 0 then
     return util.notify("All registered repositories are already in this task")
   end
-  M.select(choices, {
-    prompt = "Weft · " .. task.name .. " · add repository",
-    format_item = function(name)
-      return name .. "  " .. store.repositories[name]
-    end,
-  }, util.guard(function(name)
-    if not name then
-      return
-    end
-    workspace.add_to_task(task, name, M.config, function(repository, error_message)
-      if not repository then
-        return util.notify(error_message, vim.log.levels.ERROR)
+  M.select(
+    choices,
+    {
+      prompt = "Weft · " .. task.name .. " · add repository",
+      format_item = function(name)
+        return name .. "  " .. store.repositories[name]
+      end,
+    },
+    util.guard(function(name)
+      if not name then
+        return
       end
-      require("weft.agent").refresh_prompt(task)
-      require("weft.changes").scan(task)
-      util.notify("Added " .. repository.name .. " to " .. task.name)
+      workspace.add_to_task(task, name, M.config, function(repository, error_message)
+        if not repository then
+          return util.notify(error_message, vim.log.levels.ERROR)
+        end
+        require("weft.agent").refresh_prompt(task)
+        require("weft.changes").scan(task)
+        util.notify("Added " .. repository.name .. " to " .. task.name)
+      end)
     end)
-  end))
+  )
 end
 
 function M._tabline()
@@ -152,11 +174,14 @@ end
 
 function M.add_repository(path)
   if not path or path == "" then
-    return vim.ui.input({ prompt = "Weft repository path: ", default = vim.fn.getcwd() }, util.guard(function(value)
-      if value and value ~= "" then
-        M.add_repository(value)
-      end
-    end))
+    return vim.ui.input(
+      { prompt = "Weft repository path: ", default = vim.fn.getcwd() },
+      util.guard(function(value)
+        if value and value ~= "" then
+          M.add_repository(value)
+        end
+      end)
+    )
   end
   local name = workspace.add_repository(path)
   util.notify("Registered " .. name .. " for new tasks")
@@ -171,29 +196,37 @@ function M.repositories()
     return a.name < b.name
   end)
   table.insert(items, 1, { add = true, name = "Add repository", path = "Register a Git repository" })
-  M.select(items, {
-    prompt = "Weft repositories",
-    format_item = function(item)
-      return item.name .. "  " .. item.path
-    end,
-  }, util.guard(function(item)
-    if not item then
-      return
-    end
-    if item.add then
-      return M.add_repository()
-    end
-    vim.ui.select({ "Remove" }, {
-      prompt = "Weft · " .. item.name,
-    }, util.guard(function(action)
-      if action == "Remove" then
-        store.repositories[item.name] = nil
-        store.deleted.repositories[item.name] = true
-        store.save()
-        util.notify("Removed " .. item.name .. " from future tasks")
+  M.select(
+    items,
+    {
+      prompt = "Weft repositories",
+      format_item = function(item)
+        return item.name .. "  " .. item.path
+      end,
+    },
+    util.guard(function(item)
+      if not item then
+        return
       end
-    end))
-  end))
+      if item.add then
+        return M.add_repository()
+      end
+      vim.ui.select(
+        { "Remove" },
+        {
+          prompt = "Weft · " .. item.name,
+        },
+        util.guard(function(action)
+          if action == "Remove" then
+            store.repositories[item.name] = nil
+            store.deleted.repositories[item.name] = true
+            store.save()
+            util.notify("Removed " .. item.name .. " from future tasks")
+          end
+        end)
+      )
+    end)
+  )
 end
 
 function M.select(items, options, callback)

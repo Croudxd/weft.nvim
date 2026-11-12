@@ -97,9 +97,12 @@ local function run()
     require("weft.workspace").add_to_task(task_a, "engine", require("weft").config, function(result, message)
       added, failure, done = result, message, true
     end)
-    assert(vim.wait(10000, function()
-      return done
-    end, 10), "Timed out adding repository")
+    assert(
+      vim.wait(10000, function()
+        return done
+      end, 10),
+      "Timed out adding repository"
+    )
     assert(added, failure)
     equal(#task_a.repositories, 2)
     assert(vim.uv.fs_stat(task_a.root .. "/engine/.git"))
@@ -110,15 +113,12 @@ local function run()
   local path_b = task_b.root .. "/app/source.lua"
   test("agent writes open unseen files without changing focus or other tasks", function()
     local current = vim.api.nvim_get_current_buf()
-    files.write(
-      task_a,
-      {
-        action = "write",
-        path = "app/source.lua",
-        expected_hash = vim.fn.sha256(util.read(path_a)),
-        content = "local value = 2\nreturn value\n",
-      }
-    )
+    files.write(task_a, {
+      action = "write",
+      path = "app/source.lua",
+      expected_hash = vim.fn.sha256(util.read(path_a)),
+      content = "local value = 2\nreturn value\n",
+    })
     equal(vim.api.nvim_get_current_buf(), current)
     assert(vim.api.nvim_buf_is_loaded(vim.fn.bufnr(path_a)))
     equal(vim.b[vim.fn.bufnr(path_a)].weft_task, task_a.id)
@@ -138,27 +138,21 @@ local function run()
     local read = files.read(task_a, "app/source.lua")
     vim.api.nvim_buf_set_lines(buffer, 0, 1, false, { "local value = 20 -- my edit" })
     rejects(function()
-      files.write(
-        task_a,
-        {
-          action = "write",
-          path = "app/source.lua",
-          expected_hash = vim.fn.sha256(read),
-          content = "lost user work\n",
-        }
-      )
+      files.write(task_a, {
+        action = "write",
+        path = "app/source.lua",
+        expected_hash = vim.fn.sha256(read),
+        content = "lost user work\n",
+      })
     end, "File changed since it was read")
     local current = files.read(task_a, "app/source.lua")
-    local result = files.write(
-      task_a,
-      {
-        action = "replace",
-        path = "app/source.lua",
-        expected_hash = vim.fn.sha256(current),
-        old_text = "return value",
-        content = "return value * 2",
-      }
-    )
+    local result = files.write(task_a, {
+      action = "replace",
+      path = "app/source.lua",
+      expected_hash = vim.fn.sha256(current),
+      old_text = "return value",
+      content = "return value * 2",
+    })
     assert(result.unsaved)
     equal(util.read(path_a), "local value = 2\nreturn value\n")
     equal(util.buffer_text(buffer), "local value = 20 -- my edit\nreturn value * 2\n")
@@ -183,29 +177,23 @@ local function run()
     util.git(task_a.root .. "/engine", { "add", "." })
     util.git(task_a.root .. "/engine", { "commit", "-m", "Task progress" })
     local before = files.read(task_a, "engine/source.lua")
-    files.write(
-      task_a,
-      {
-        action = "write",
-        path = "engine/source.lua",
-        expected_hash = vim.fn.sha256(before),
-        content = "return 'follow-up'\n",
-      }
-    )
+    files.write(task_a, {
+      action = "write",
+      path = "engine/source.lua",
+      expected_hash = vim.fn.sha256(before),
+      content = "return 'follow-up'\n",
+    })
     scan(task_a)
     equal(changes.state(task_a).entries[path].before, "local value = 1\nreturn value\n")
     assert(changes.state(task_a).entries[path].ai_lines[1])
   end)
   test("ignored files explicitly edited by the AI are included in change tracking", function()
-    files.write(
-      task_a,
-      {
-        action = "write",
-        path = "engine/ignored.txt",
-        expected_hash = "missing",
-        content = "tracked by Weft\n",
-      }
-    )
+    files.write(task_a, {
+      action = "write",
+      path = "engine/ignored.txt",
+      expected_hash = "missing",
+      content = "tracked by Weft\n",
+    })
     scan(task_a)
     assert(changes.state(task_a).entries[task_a.root .. "/engine/ignored.txt"].changed)
     assert(vim.api.nvim_buf_is_loaded(vim.fn.bufnr(task_a.root .. "/engine/ignored.txt")))
@@ -237,15 +225,12 @@ local function run()
     local before = files.read(task_b, "app/source.lua")
     util.write(path_b, "new disk contents\n")
     rejects(function()
-      files.write(
-        task_b,
-        {
-          action = "write",
-          path = "app/source.lua",
-          expected_hash = vim.fn.sha256(before),
-          content = "stale\n",
-        }
-      )
+      files.write(task_b, {
+        action = "write",
+        path = "app/source.lua",
+        expected_hash = vim.fn.sha256(before),
+        content = "stale\n",
+      })
     end, "File changed since it was read")
     equal(util.read(path_b), "new disk contents\n")
   end)
@@ -297,13 +282,17 @@ local function run()
     require("weft.workspace").delete(disposable, function(result, message)
       removed, failure, done = result, message, true
     end)
-    assert(vim.wait(10000, function()
-      return done
-    end, 10), "Timed out deleting task")
+    assert(
+      vim.wait(10000, function()
+        return done
+      end, 10),
+      "Timed out deleting task"
+    )
     assert(removed, failure)
     assert(not vim.uv.fs_stat(disposable.root))
     assert(not require("weft.store").tasks.dispose)
-    local branch = vim.system({ "git", "-C", second, "show-ref", "--verify", "--quiet", "refs/heads/weft/dispose" }):wait()
+    local branch =
+      vim.system({ "git", "-C", second, "show-ref", "--verify", "--quiet", "refs/heads/weft/dispose" }):wait()
     equal(branch.code, 1)
   end)
   test("task and snapshot persistence lives outside the source repositories", function()

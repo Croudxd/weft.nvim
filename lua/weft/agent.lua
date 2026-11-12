@@ -261,9 +261,12 @@ function M.get(task)
   local saved = util.load_json(store.task_directory(task) .. "/chat.json", nil)
   local config = require("weft").config
   chat = require("codecompanion.interactions.chat").new({
-    adapter = require("codecompanion.adapters").resolve((saved and saved.adapter) or task.adapter or config.adapter, {
-      model = (saved and saved.model) or task.model or config.model,
-    }),
+    adapter = require("codecompanion.adapters").resolve(
+      (saved and saved.adapter) or task.adapter or config.adapter,
+      {
+        model = (saved and saved.model) or task.model or config.model,
+      }
+    ),
     title = "Weft · " .. task.name,
     hidden = true,
     buffer_context = require("codecompanion.utils.context").get(),
@@ -461,36 +464,45 @@ function M.pick_model(task)
   local chat = M.get(task)
   local current_adapter = chat.adapter.name
   local current_model = chat.settings.model
-  require("weft").select(M.adapters(current_adapter), {
-    prompt = "Weft · " .. task.name .. " · provider",
-    format_item = function(name)
-      return name .. (name == current_adapter and "  (current)" or "")
-    end,
-  }, util.guard(function(adapter)
-    if not adapter then
-      return
-    end
-    if adapter ~= current_adapter and not M.set_adapter(task, adapter) then
-      return
-    end
-    chat = M.get(task)
-    local choices = require("codecompanion.adapters.ui").list_http_models(chat.adapter)
-    if not choices then
-      return util.notify("No selectable models exposed by " .. chat.adapter.name)
-    end
-    require("weft").select(choices, {
-      prompt = "Weft · " .. task.name .. " · " .. chat.adapter.name .. " · model",
-      format_item = function(choice)
-        local name = type(choice) == "table" and (choice.id or choice.modelId) or choice
-        local label = type(choice) == "table" and (choice.formatted_name or choice.description or name) or name
-        return label .. (name == current_model and "  (current)" or "")
+  require("weft").select(
+    M.adapters(current_adapter),
+    {
+      prompt = "Weft · " .. task.name .. " · provider",
+      format_item = function(name)
+        return name .. (name == current_adapter and "  (current)" or "")
       end,
-    }, util.guard(function(choice)
-      if choice then
-        M.set_model(task, type(choice) == "table" and (choice.id or choice.modelId) or choice)
+    },
+    util.guard(function(adapter)
+      if not adapter then
+        return
       end
-    end))
-  end))
+      if adapter ~= current_adapter and not M.set_adapter(task, adapter) then
+        return
+      end
+      chat = M.get(task)
+      local choices = require("codecompanion.adapters.ui").list_http_models(chat.adapter)
+      if not choices then
+        return util.notify("No selectable models exposed by " .. chat.adapter.name)
+      end
+      require("weft").select(
+        choices,
+        {
+          prompt = "Weft · " .. task.name .. " · " .. chat.adapter.name .. " · model",
+          format_item = function(choice)
+            local name = type(choice) == "table" and (choice.id or choice.modelId) or choice
+            local label = type(choice) == "table" and (choice.formatted_name or choice.description or name)
+              or name
+            return label .. (name == current_model and "  (current)" or "")
+          end,
+        },
+        util.guard(function(choice)
+          if choice then
+            M.set_model(task, type(choice) == "table" and (choice.id or choice.modelId) or choice)
+          end
+        end)
+      )
+    end)
+  )
 end
 
 function M.attach(task)
