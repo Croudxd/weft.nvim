@@ -49,14 +49,14 @@ end
 function M.state(task)
   if not M.states[task.id] then
     M.states[task.id] =
-      util.load_json(store.task_directory(task) .. "/changes.json", { entries = {}, history = {} })
+      util.load_json(store.task_directory(task) .. "/changes.json", { entries = {} })
   end
   return M.states[task.id]
 end
 
 function M.save(task)
   local state = M.state(task)
-  local content = vim.json.encode({ entries = state.entries, history = state.history })
+  local content = vim.json.encode({ entries = state.entries })
   if content ~= state.saved_content then
     local path = store.task_directory(task) .. "/changes.json"
     util.write(path .. ".tmp", content)
@@ -90,16 +90,7 @@ end
 function M.record(task, path, before, after)
   local entry = M.capture(task, path, before)
   mark_ai_lines(entry, before or "", after or "")
-  entry.ai_hash = vim.fn.sha256(after or "")
-  entry.actor = "ai"
   entry.seen_hash = nil
-  table.insert(M.state(task).history, {
-    path = path,
-    before = before,
-    after = after,
-    actor = "ai",
-    time = os.time(),
-  })
   M.refresh_file(task, entry)
   M.save(task)
 end
@@ -112,16 +103,17 @@ function M.refresh_file(task, entry)
     or (disk and (disk:find("\0", 1, true) ~= nil or #disk > require("weft").config.max_file_bytes))
     or false
   local current = disk or ""
-  local buffer = vim.fn.bufnr(entry.path)
+  local buffer = vim.fn.bufexists(entry.path) == 1 and vim.fn.bufadd(entry.path) or -1
   if disk and stat and stat.type == "file" and not entry.binary then
-    buffer = buffers.load(task, entry.path)
+    -- Do not load every changed file during a scan. Loading hundreds of source
+    -- buffers is expensive; only an already-open buffer needs reconciliation.
     local disk_hash = vim.fn.sha256(disk)
-    if vim.bo[buffer].modified then
+    if buffer >= 0 and vim.api.nvim_buf_is_loaded(buffer) and vim.bo[buffer].modified then
       current = util.buffer_text(buffer)
       if entry.disk_hash and entry.disk_hash ~= disk_hash and current ~= disk then
         entry.disk_conflict = true
       end
-    else
+    elseif buffer >= 0 and vim.api.nvim_buf_is_loaded(buffer) then
       entry.disk_conflict = nil
       if util.buffer_text(buffer) ~= disk then
         util.set_text(buffer, disk)
@@ -129,7 +121,7 @@ function M.refresh_file(task, entry)
       end
     end
     entry.disk_hash = disk_hash
-    if not entry.disk_conflict then
+    if buffer >= 0 and vim.api.nvim_buf_is_loaded(buffer) and not entry.disk_conflict then
       vim.b[buffer].weft_disk_hash = disk_hash
     end
   elseif buffer >= 0 and vim.api.nvim_buf_is_loaded(buffer) and vim.bo[buffer].modified then
