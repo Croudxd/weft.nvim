@@ -20,7 +20,9 @@ jobs:
           version: nightly
       - name: Install formatter and chat test dependencies
         run: |
-          sudo snap install stylua --classic
+          curl --fail --location --output /tmp/stylua.zip https://github.com/JohnnyMorganz/StyLua/releases/download/v2.3.1/stylua-linux-x86_64.zip
+          unzip -q /tmp/stylua.zip -d /tmp/stylua
+          sudo install /tmp/stylua/stylua /usr/local/bin/stylua
           mkdir -p "$HOME/.local/share/nvim/lazy"
           git clone --depth 1 https://github.com/nvim-lua/plenary.nvim "$HOME/.local/share/nvim/lazy/plenary.nvim"
           git clone https://github.com/olimorris/codecompanion.nvim "$HOME/.local/share/nvim/lazy/codecompanion.nvim"
