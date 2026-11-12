@@ -457,13 +457,6 @@ function M.adapters(current)
   return require("codecompanion.adapters.ui").get_adapters_list(current)
 end
 
-function M.model_names()
-  local adapter = M.codex_adapter()
-  local names = vim.tbl_keys(adapter.schema.model.choices or {})
-  table.sort(names)
-  return names
-end
-
 function M.pick_model(task)
   local chat = M.get(task)
   local current_adapter = chat.adapter.name
