@@ -3,10 +3,17 @@ local store = require("weft.store")
 local M = {}
 
 function M.claim(buffer)
-  local task = store.owner(vim.api.nvim_buf_get_name(buffer))
+  if vim.bo[buffer].buftype ~= "" then
+    return nil
+  end
+  local path = vim.api.nvim_buf_get_name(buffer)
+  if path == "" then
+    return nil
+  end
+  local task = store.owner(path)
   if task then
     vim.b[buffer].weft_task = task.id
-    if not vim.b[buffer].weft_mapped then
+    if require("weft").config.mappings and not vim.b[buffer].weft_mapped then
       vim.b[buffer].weft_mapped = true
       for key, direction in pairs({ ["<S-l>"] = 1, ["<S-h>"] = -1 }) do
         vim.keymap.set("n", key, function()

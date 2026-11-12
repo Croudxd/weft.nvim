@@ -502,28 +502,28 @@ M.bindings = {
     "Toggle Weft shortcuts",
   },
   {
-    "]a",
+    "<leader>w]",
     function()
       require("weft.changes").jump(current(), 1)
     end,
     "Next task change",
   },
   {
-    "[a",
+    "<leader>w[",
     function()
       require("weft.changes").jump(current(), -1)
     end,
     "Previous task change",
   },
   {
-    "]b",
+    "<leader>wb]",
     function()
       require("weft.buffers").cycle(current(), 1)
     end,
     "Next task source buffer",
   },
   {
-    "[b",
+    "<leader>wb[",
     function()
       require("weft.buffers").cycle(current(), -1)
     end,
