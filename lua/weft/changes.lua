@@ -196,8 +196,9 @@ function M.scan(task, callback)
     candidates[path] = true
   end
   for _, buffer in ipairs(buffers.list(task)) do
-    if vim.bo[buffer].modified then
-      candidates[vim.api.nvim_buf_get_name(buffer)] = true
+    local path = vim.api.nvim_buf_get_name(buffer)
+    if vim.bo[buffer].modified and store.repository(task, path) then
+      candidates[path] = true
     end
   end
   local function finish()
@@ -221,7 +222,7 @@ function M.scan(task, callback)
     if not repository then
       return finish()
     end
-    run_git(repository, { "diff", "--name-only", "-z", repository.base, "--" }, function(diff)
+    run_git(repository, { "diff", "--no-renames", "--name-only", "-z", repository.base, "--" }, function(diff)
       if diff.code ~= 0 then
         state.scanning = false
         util.notify("Cannot scan " .. repository.path .. ": " .. diff.stderr, vim.log.levels.ERROR)
