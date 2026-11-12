@@ -576,6 +576,27 @@ M.bindings = {
   },
 }
 
+local function apply_context_settings()
+  local ok, config = pcall(require, "codecompanion.config")
+  if not ok or not (config.interactions and config.interactions.chat) then
+    return
+  end
+  local context = M.config.context
+  local options = config.interactions.chat.opts
+  options.context_management = options.context_management or {}
+  options.context_management.enabled = context.compact
+  options.context_management.editing = vim.tbl_deep_extend(
+    "force",
+    options.context_management.editing or {},
+    { trigger = context.edit_threshold, keep_cycles = context.keep_tool_cycles }
+  )
+  options.context_management.compaction = vim.tbl_deep_extend(
+    "force",
+    options.context_management.compaction or {},
+    { trigger = context.compact_threshold }
+  )
+end
+
 local function highlights()
   vim.api.nvim_set_hl(0, "WeftAI", { default = true, bg = "#20352e" })
   vim.api.nvim_set_hl(0, "WeftRemoved", { default = true, link = "DiagnosticWarn" })
@@ -697,6 +718,7 @@ function M.setup(options)
     vim.o.tabline = "%!v:lua.require'weft'._tabline()"
   end
   store.setup(M.config)
+  apply_context_settings()
   local group = vim.api.nvim_create_augroup("Weft", { clear = true })
   vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile" }, {
     group = group,
