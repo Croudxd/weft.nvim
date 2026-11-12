@@ -7,7 +7,7 @@ function M.check()
   else
     vim.health.error("Neovim 0.12+ is required")
   end
-  for _, executable in ipairs({ "git", "curl", "openssl", "rg", "bash" }) do
+  for _, executable in ipairs({ "git", "rg", "bash" }) do
     if vim.fn.executable(executable) == 1 then
       vim.health.ok(executable .. " available")
     else

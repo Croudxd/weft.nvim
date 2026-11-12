@@ -9,7 +9,9 @@ local M = { states = {}, namespace = vim.api.nvim_create_namespace("weft.changes
 local function remap_ai_lines(previous, content, old_marks, mark_inserted)
   local next_marks = {}
   local old_row, new_row = 1, 1
-  for _, hunk in ipairs(vim.diff(previous, content, { result_type = "indices", algorithm = "histogram" })) do
+  for _, hunk in
+    ipairs(vim.text.diff(previous, content, { result_type = "indices", algorithm = "histogram" }))
+  do
     local old_start = hunk[1] + (hunk[2] == 0 and 1 or 0)
     local new_start = hunk[3] + (hunk[4] == 0 and 1 or 0)
     while old_row < old_start and new_row < new_start do
@@ -136,7 +138,7 @@ function M.refresh_file(task, entry)
   entry.current_hash = vim.fn.sha256(current)
   entry.changed = current ~= entry.before or entry.deleted == entry.existed
   entry.hunks = entry.binary and {}
-    or vim.diff(entry.before, current, { result_type = "indices", algorithm = "histogram" })
+    or vim.text.diff(entry.before, current, { result_type = "indices", algorithm = "histogram" })
 
   if buffer >= 0 and vim.api.nvim_buf_is_loaded(buffer) then
     vim.api.nvim_buf_clear_namespace(buffer, M.namespace, 0, -1)
