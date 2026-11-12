@@ -56,8 +56,12 @@ local function execute(self, args, options)
       vim.schedule_wrap(function(result)
         require("weft.changes").scan(task)
         local text = "Exit " .. result.code .. "\n" .. (result.stdout or "") .. (result.stderr or "")
+        local limit = 40000
+        if #text > limit then
+          text = text:sub(1, limit) .. "\n[Output truncated after " .. limit .. " bytes]"
+        end
         local success = result.code == 0 or (args.action == "search" and result.code == 1)
-        options.output_cb({ status = success and "success" or "error", data = text:sub(1, 40000) })
+        options.output_cb({ status = success and "success" or "error", data = text })
       end)
     )
     options.register_job(job)
@@ -111,9 +115,13 @@ M.output = {
       delete = "Deleted",
       command = "Ran command in",
     }
+    local display = (labels[self.args.action] or self.args.action) .. " `" .. self.args.path .. "`"
+    if self.args.action == "command" then
+      display = display .. ": " .. tostring(self.args.content):gsub("%s+", " ")
+    end
     meta.tools.chat:add_tool_output(self, {
       content = tostring(stdout[#stdout]),
-      display = (labels[self.args.action] or self.args.action) .. " `" .. self.args.path .. "`",
+      display = display,
     })
   end,
   error = function(self, stderr, meta)
