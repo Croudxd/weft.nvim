@@ -431,6 +431,21 @@ function M.stop(task)
   end
 end
 
+function M.reset(task)
+  local chat = M.chats[task.id]
+  assert(
+    not (chat and chat.current_request) and M.status[task.id] ~= "working",
+    "Stop the agent before starting a new chat"
+  )
+  if chat then
+    chat:close()
+  end
+  M.chats[task.id], M.status[task.id] = nil, nil
+  vim.fn.delete(store.task_directory(task) .. "/chat.json")
+  M.toggle(task, { open = true })
+  util.notify("Started a new chat for " .. task.name .. "; task files and changes are preserved")
+end
+
 function M.set_model(task, model)
   local chat = M.get(task)
   assert(not chat.current_request, "Stop the current request before switching models")

@@ -140,6 +140,10 @@ function M.delete(task)
   )
 end
 
+function M.new_chat()
+  require("weft.agent").reset(current())
+end
+
 function M.add_to_task()
   local task = current()
   local choices = {}
@@ -347,6 +351,9 @@ function M.menu()
       M.config.load_chat()
       require("weft.agent").pick_model(task)
     end)
+    add("New task chat", "Keep task files but start a fresh conversation", function()
+      M.new_chat()
+    end)
     add("Add repository to task", "Create another isolated repository worktree", function()
       M.add_to_task()
     end)
@@ -499,6 +506,13 @@ M.bindings = {
       require("weft.agent").attach(current())
     end,
     "Attach current task buffer",
+  },
+  {
+    "<leader>wN",
+    function()
+      M.new_chat()
+    end,
+    "Start a new task chat",
   },
   {
     "<leader>wA",
@@ -656,6 +670,7 @@ local function command(args)
     stop = function()
       require("weft.agent").stop(current())
     end,
+    new_chat = M.new_chat,
     delete = M.delete,
     hide = M.hide,
     help = function()
@@ -689,6 +704,7 @@ function M.complete(lead, line, cursor)
       "browse",
       "send",
       "stop",
+      "new_chat",
       "delete",
       "hide",
       "help",
