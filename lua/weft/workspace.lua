@@ -153,23 +153,6 @@ function M.delete(task, callback)
     end
   end
 
-  -- Preflight every repository before removing any worktree. This avoids a
-  -- partially deleted task when one worktree contains ordinary uncommitted work.
-  for _, repository in ipairs(task.repositories) do
-    local status = vim
-      .system({ "git", "-C", repository.path, "status", "--porcelain" }, { text = true })
-      :wait()
-    if status.code ~= 0 then
-      return callback(nil, "Task worktree is missing or invalid: " .. repository.name)
-    end
-    if vim.trim(status.stdout) ~= "" then
-      return callback(
-        nil,
-        "Commit, discard, or move changes in " .. repository.name .. " before deleting the task"
-      )
-    end
-  end
-
   local function remove(index)
     local repository = task.repositories[index]
     if not repository then
@@ -181,7 +164,7 @@ function M.delete(task, callback)
       return callback(true)
     end
     vim.system(
-      { "git", "-C", repository.source, "worktree", "remove", repository.path },
+      { "git", "-C", repository.source, "worktree", "remove", "--force", repository.path },
       { text = true },
       vim.schedule_wrap(function(result)
         if result.code ~= 0 then

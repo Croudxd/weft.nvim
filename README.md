@@ -149,9 +149,10 @@ run Git worktree lifecycle operations on its own.
 
 Use **`<leader>wd`** or choose **Delete task** in the command centre. Type the
 task name exactly to confirm. Weft refuses to delete a task with unsaved source
-buffers. On confirmation it removes every task worktree, deletes its `weft/TASK`
-branches, and removes the task's saved chat and change state. Original
-repositories and registered-repository settings are left untouched.
+buffers. On confirmation it discards every task worktree (including uncommitted
+work), deletes its `weft/TASK` branches, and removes the task's saved chat and
+change state. Original repositories and registered-repository settings are left
+untouched.
 
 ## Daily shortcuts
 
