@@ -152,6 +152,7 @@ function M.delete(task, callback)
     local repository = task.repositories[index]
     if not repository then
       store.tasks[task.id] = nil
+      store.deleted.tasks[task.id] = true
       store.save()
       vim.fn.delete(store.task_directory(task), "rf")
       pcall(vim.uv.fs_rmdir, task.root)

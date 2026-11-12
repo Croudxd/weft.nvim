@@ -188,6 +188,7 @@ function M.repositories()
     }, util.guard(function(action)
       if action == "Remove" then
         store.repositories[item.name] = nil
+        store.deleted.repositories[item.name] = true
         store.save()
         util.notify("Removed " .. item.name .. " from future tasks")
       end

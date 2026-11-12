@@ -1,5 +1,5 @@
 local util = require("weft.util")
-local M = { tasks = {}, repositories = {} }
+local M = { tasks = {}, repositories = {}, deleted = {} }
 
 function M.setup(options)
   M.directory = options.state_dir
@@ -10,10 +10,21 @@ function M.setup(options)
 end
 
 function M.save()
+  -- Another Neovim instance may have created tasks or registered repositories
+  -- after this instance started. Merge the latest registry before replacing it.
+  local saved = util.load_json(M.directory .. "/state.json", { tasks = {}, repositories = {} })
+  M.tasks = vim.tbl_extend("force", saved.tasks or {}, M.tasks)
+  M.repositories = vim.tbl_extend("force", saved.repositories or {}, M.repositories)
+  for kind, names in pairs(M.deleted) do
+    for name in pairs(names) do
+      M[kind][name] = nil
+    end
+  end
   util.save_json(
     M.directory .. "/state.json",
     { version = 1, tasks = M.tasks, repositories = M.repositories }
   )
+  M.deleted = { tasks = {}, repositories = {} }
 end
 
 function M.task_directory(task)

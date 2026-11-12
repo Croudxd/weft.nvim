@@ -120,6 +120,33 @@ function M.reveal(task, path, line)
   end)
 end
 
+-- Following an agent write must never interrupt typing or pull the user from a
+-- different task. Only update an existing source window in the active task.
+function M.follow(task, path, line)
+  if vim.api.nvim_get_mode().mode:sub(1, 1) ~= "n" or vim.t.weft_task ~= task.id then
+    return false
+  end
+  local destination
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    local candidate = vim.api.nvim_win_get_buf(win)
+    if vim.b[candidate].weft_task == task.id and vim.bo[candidate].buftype == "" then
+      destination = win
+      break
+    end
+  end
+  if not destination then
+    return false
+  end
+  local buffer = require("weft.buffers").load(task, path)
+  vim.api.nvim_win_set_buf(destination, buffer)
+  line = math.min(math.max(1, line or 1), vim.api.nvim_buf_line_count(buffer))
+  vim.api.nvim_win_set_cursor(destination, { line, 0 })
+  vim.api.nvim_win_call(destination, function()
+    vim.cmd("normal! zz")
+  end)
+  return true
+end
+
 function M.open_change(task, entry, index)
   index = index or 1
   M.last[task.id] = { entry = entry, index = index }

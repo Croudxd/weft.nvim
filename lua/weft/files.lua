@@ -106,7 +106,7 @@ function M.write(task, args)
     -- Use the first hunk recorded from this write, not the file's old cursor
     -- position, so following an agent always lands directly on its edit.
     vim.schedule(function()
-      require("weft.ui").reveal(task, path, changed_line)
+      require("weft.ui").follow(task, path, changed_line)
     end)
   end
   return {
