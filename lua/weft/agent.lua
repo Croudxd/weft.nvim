@@ -426,7 +426,7 @@ end
 
 function M.stop(task)
   local chat = M.chats[task.id]
-  if chat then
+  if chat and (chat.current_request or M.status[task.id] == "working") then
     chat:stop()
   end
 end
@@ -448,7 +448,10 @@ end
 
 function M.set_model(task, model)
   local chat = M.get(task)
-  assert(not chat.current_request, "Stop the current request before switching models")
+  assert(
+    not chat.current_request and M.status[task.id] ~= "working",
+    "Stop the agent before switching models"
+  )
   chat:change_model({ model = model })
   task.model, task.adapter = model, chat.adapter.name
   store.save()
@@ -458,7 +461,10 @@ end
 
 function M.set_adapter(task, name)
   local chat = M.get(task)
-  assert(not chat.current_request, "Stop the current request before switching adapters")
+  assert(
+    not chat.current_request and M.status[task.id] ~= "working",
+    "Stop the agent before switching adapters"
+  )
   local changed = chat:change_adapter({ adapter = name })
   if not changed then
     return false
