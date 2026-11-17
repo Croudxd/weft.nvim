@@ -225,6 +225,10 @@ require("weft").setup({
   -- agent does not move your focus unless you ask for it.
   open_changed_files = false,
 
+  -- Release inactive chat buffers from memory. They restore from saved state
+  -- when their task is opened again.
+  unload_inactive_chats = true,
+
   -- Use Weft's simple task-named tabline. Off by default so it does not replace
   -- another tabline/bufferline plugin.
   tabline = false,

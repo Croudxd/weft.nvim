@@ -193,6 +193,10 @@ end
 
 function M.switch(task)
   assert(vim.uv.fs_stat(task.root), "Task directory is missing: " .. task.root)
+  local previous = M.current()
+  if previous and previous.id ~= task.id and require("weft").config.unload_inactive_chats then
+    require("weft.agent").unload(previous)
+  end
   for _, tab in ipairs(vim.api.nvim_list_tabpages()) do
     local ok, id = pcall(vim.api.nvim_tabpage_get_var, tab, "weft_task")
     if ok and id == task.id then

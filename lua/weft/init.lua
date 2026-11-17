@@ -15,6 +15,7 @@ local defaults = {
   model = "gpt-5.3-codex",
   mappings = true,
   open_changed_files = false,
+  unload_inactive_chats = true,
   tabline = false,
   context = {
     compact = true,

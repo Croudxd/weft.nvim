@@ -431,6 +431,25 @@ function M.stop(task)
   end
 end
 
+-- Long CodeCompanion conversations keep both their full message history and a
+-- rendered Markdown/Tree-sitter buffer resident. Persist inactive chats and
+-- rebuild them on demand so switching between many tasks does not retain them.
+function M.unload(task)
+  local chat = M.chats[task.id]
+  if not chat or chat.current_request or M.status[task.id] == "working" then
+    return false
+  end
+  M.save(task)
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_get_buf(win) == chat.bufnr then
+      vim.api.nvim_win_close(win, true)
+    end
+  end
+  chat:close()
+  M.chats[task.id] = nil
+  return true
+end
+
 function M.reset(task)
   local chat = M.chats[task.id]
   assert(
