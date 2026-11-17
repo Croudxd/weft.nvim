@@ -59,9 +59,7 @@ function M.save(task)
   local state = M.state(task)
   local content = vim.json.encode({ entries = state.entries })
   if content ~= state.saved_content then
-    local path = store.task_directory(task) .. "/changes.json"
-    util.write(path .. ".tmp", content)
-    assert(vim.uv.fs_rename(path .. ".tmp", path))
+    util.save_json(store.task_directory(task) .. "/changes.json", { entries = state.entries })
     state.saved_content = content
   end
 end
