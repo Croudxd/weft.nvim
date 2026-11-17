@@ -722,6 +722,7 @@ function M.setup(options)
   if M.timer then
     M.timer:stop()
     M.timer:close()
+    M.timer = nil
   end
   M.config = vim.tbl_deep_extend("force", defaults, options or {})
   M.config.worktree_root = util.path(M.config.worktree_root)
