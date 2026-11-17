@@ -75,7 +75,7 @@ M.cmds = {
   function(self, args, options)
     local ok, result = pcall(execute, self, args, options)
     if not ok then
-      return { status = "error", data = tostring(result) }
+      return { status = "error", data = util.error_message(result) }
     end
     return result
   end,

@@ -90,11 +90,15 @@ function M.set_text(buffer, content)
   vim.bo[buffer].endofline = content:sub(-1) == "\n"
 end
 
+function M.error_message(value)
+  return tostring(value):gsub("^.-:%d+:%s*", "")
+end
+
 function M.guard(callback)
   return function(...)
     local ok, result = pcall(callback, ...)
     if not ok then
-      M.notify(tostring(result), vim.log.levels.ERROR)
+      M.notify(M.error_message(result), vim.log.levels.ERROR)
     end
     return ok and result or nil
   end
