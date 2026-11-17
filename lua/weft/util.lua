@@ -47,7 +47,7 @@ function M.write(path, content)
 end
 
 function M.save_json(path, value)
-  local temporary = path .. ".tmp"
+  local temporary = path .. "." .. vim.uv.os_getpid() .. "." .. vim.uv.hrtime() .. ".tmp"
   M.write(temporary, vim.json.encode(value))
   assert(vim.uv.fs_rename(temporary, path))
 end
