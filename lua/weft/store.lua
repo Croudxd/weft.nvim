@@ -10,21 +10,37 @@ function M.setup(options)
 end
 
 function M.save()
-  -- Another Neovim instance may have created tasks or registered repositories
-  -- after this instance started. Merge the latest registry before replacing it.
-  local saved = util.load_json(M.directory .. "/state.json", { tasks = {}, repositories = {} })
-  M.tasks = vim.tbl_extend("force", saved.tasks or {}, M.tasks)
-  M.repositories = vim.tbl_extend("force", saved.repositories or {}, M.repositories)
-  for kind, names in pairs(M.deleted) do
-    for name in pairs(names) do
-      M[kind][name] = nil
+  local lock = M.directory .. "/state.lock"
+  local started = vim.uv.hrtime()
+  while true do
+    local fd, error_message = vim.uv.fs_open(lock, "wx", 384)
+    if fd then
+      vim.uv.fs_close(fd)
+      break
     end
+    assert(error_message == "EEXIST", error_message)
+    assert(vim.uv.hrtime() - started < 2e9, "Timed out waiting to save Weft state")
+    vim.wait(10)
   end
-  util.save_json(
-    M.directory .. "/state.json",
-    { version = 1, tasks = M.tasks, repositories = M.repositories }
-  )
-  M.deleted = { tasks = {}, repositories = {} }
+  local ok, error_message = xpcall(function()
+    -- Another Neovim instance may have created tasks or registered repositories
+    -- after this instance started. Merge the latest registry before replacing it.
+    local saved = util.load_json(M.directory .. "/state.json", { tasks = {}, repositories = {} })
+    M.tasks = vim.tbl_extend("force", saved.tasks or {}, M.tasks)
+    M.repositories = vim.tbl_extend("force", saved.repositories or {}, M.repositories)
+    for kind, names in pairs(M.deleted) do
+      for name in pairs(names) do
+        M[kind][name] = nil
+      end
+    end
+    util.save_json(
+      M.directory .. "/state.json",
+      { version = 1, tasks = M.tasks, repositories = M.repositories }
+    )
+    M.deleted = { tasks = {}, repositories = {} }
+  end, debug.traceback)
+  vim.uv.fs_unlink(lock)
+  assert(ok, error_message)
 end
 
 function M.task_directory(task)
