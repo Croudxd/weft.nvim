@@ -173,7 +173,9 @@ Your leader key is whatever your Neovim setup uses.
 | `<leader>wb` | Pick a source buffer belonging to the task |
 | `<leader>wo` | Show code from before the task started |
 | `<leader>wr` | Re-scan changes from disk/Git |
-| `]a` / `[a` | Next / previous changed hunk |
+| `<leader>w]` / `<leader>w[` | Next / previous changed hunk |
+| `<leader>wb]` / `<leader>wb[` | Next / previous task source buffer |
+| `<leader>wN` | Start a fresh chat without changing task files |
 
 Inside the changes pane:
 
