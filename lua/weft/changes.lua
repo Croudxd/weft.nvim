@@ -204,20 +204,37 @@ function M.scan(task, callback)
     end
   end
   local function finish()
-    local ok, error_message = pcall(function()
-      for path in pairs(candidates) do
-        M.refresh_file(task, M.capture(task, path))
+    local paths = vim.tbl_keys(candidates)
+    local index = 1
+    local function refresh_batch()
+      local ok, error_message = pcall(function()
+        -- Reading a task baseline may invoke Git. Yield between small batches
+        -- so a large external change does not freeze editor input for seconds.
+        local last = math.min(index + 15, #paths)
+        for i = index, last do
+          local path = paths[i]
+          M.refresh_file(task, M.capture(task, path))
+        end
+        index = last + 1
+        if index <= #paths then
+          return vim.schedule(refresh_batch)
+        end
+        M.save(task)
+        require("weft.ui").refresh_changes(task)
+        state.scanning = false
+        if callback then
+          callback()
+        end
+      end)
+      if not ok then
+        state.scanning = false
+        util.notify(util.error_message(error_message), vim.log.levels.ERROR)
+        if callback then
+          callback()
+        end
       end
-      M.save(task)
-      require("weft.ui").refresh_changes(task)
-    end)
-    state.scanning = false
-    if not ok then
-      util.notify(tostring(error_message), vim.log.levels.ERROR)
     end
-    if callback then
-      callback()
-    end
+    refresh_batch()
   end
   local function advance(index)
     local repository = task.repositories[index]
